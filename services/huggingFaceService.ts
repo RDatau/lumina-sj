@@ -100,6 +100,26 @@ export const proxyFetch = async (targetUrl: string, init?: RequestInit): Promise
   const proxyUrl = toProxyUrl(targetUrl);
   try {
     const resp = await fetch(proxyUrl, init);
+    const contentType = resp.headers.get('content-type') || '';
+    
+    // Deteksi jika endpoint proxy lokal mengembalikan HTML (Vercel SPA rewrite fallback ke index.html)
+    // padahal target yang diminta adalah endpoint API JSON/SSE/Binary
+    if (
+      resp.ok && 
+      contentType.includes('text/html') && 
+      !targetUrl.includes('.html') && 
+      !targetUrl.includes('huggingface.co/spaces')
+    ) {
+      console.warn("[HF-Proxy] Proxy endpoint mengembalikan HTML (Vercel static fallback). Mengalihkan langsung ke direct fetch...");
+      return await fetch(targetUrl, init);
+    }
+
+    // Jika proxy lokal 404/405/502/504, coba direct fetch
+    if (resp.status === 404 || resp.status === 405 || resp.status === 502 || resp.status === 504) {
+      console.warn(`[HF-Proxy] Proxy status ${resp.status}. Mengalihkan langsung ke direct fetch...`);
+      return await fetch(targetUrl, init);
+    }
+
     return resp;
   } catch (proxyErr) {
     console.warn("[HF-Proxy] Proxy request error, attempting direct fetch fallback:", proxyErr);
@@ -622,10 +642,17 @@ const callGradioLegacy = async (
  */
 const isQuotaOrLimitError = (err: any): boolean => {
   if (!err) return false;
-  const status = err.status || err.statusCode;
-  if (status === 429 || status === 401 || status === 403 || status === 503 || status === 504 || status === 502) return true;
-
   const msg = (err.message || err.raw || String(err)).toLowerCase();
+
+  // Jika error adalah respons HTML atau kegagalan parsing proxy, BUKAN error kuota token
+  if (msg.includes('<!doctype') || msg.includes('<html') || msg.includes('bukan json') || msg.includes('url target') || msg.includes('sleeping')) {
+    return false;
+  }
+
+  const status = err.status || err.statusCode;
+  if (status === 429 || status === 402) return true;
+  if (status === 401 || status === 403) return true;
+
   return (
     msg.includes('quota') ||
     msg.includes('kuota') ||
@@ -634,20 +661,12 @@ const isQuotaOrLimitError = (err: any): boolean => {
     msg.includes('too many requests') ||
     msg.includes('exhausted') ||
     msg.includes('credit') ||
-    msg.includes('unauthorized') ||
     msg.includes('gpu limit') ||
     msg.includes('gpu quota') ||
-    msg.includes('zerogpu') ||
-    msg.includes('antrean gpu') ||
-    msg.includes('gpu') ||
-    msg.includes('stream') ||
-    msg.includes('space execution error') ||
-    msg.includes('busy') ||
-    msg.includes('timeout') ||
-    msg.includes('try again') ||
-    msg.includes('429') ||
-    msg.includes('503') ||
-    msg.includes('504')
+    msg.includes('zerogpu limit') ||
+    msg.includes('zerogpu quota') ||
+    msg.includes('antrean gpu penuh') ||
+    msg.includes('429')
   );
 };
 
@@ -981,15 +1000,21 @@ export const generateWithHuggingFaceSpace = async (
       const errMsg = err?.message || String(err);
       console.warn(`[HF-ZeroGPU] Percobaan ${attempts} (Akun #${currentTokenIndex + 1}) gagal:`, errMsg);
 
-      // JIKA MASIH ADA TOKEN CADANGAN (attempts < maxAttempts):
-      // SELALU rotasikan ke token berikutnya dan coba lagi! Jangan pernah menyerah jika ada akun cadangan.
-      if (tokens.length > 1 && attempts < maxAttempts) {
+      const isQuota = isQuotaOrLimitError(err);
+      if (isQuota && tokenToUse) {
+        markTokenExhausted(tokenToUse);
+      }
+
+      // HANYA rotasikan ke token berikutnya jika error terkait kuota/otorisasi token.
+      // Jika error terkait infrastruktur (misal: Space sleeping, URL salah, atau proxy error),
+      // hentikan perulangan dan laporkan error aslinya agar tidak terjadi loop tanpa henti.
+      if (isQuota && tokens.length > 1 && attempts < maxAttempts) {
         rotateToken(tokens, onStatusUpdate);
         continue;
-      } else if (tokens.length > 0 && attempts >= maxAttempts) {
-        // Semua token akun sudah dicoba. Coba satu kali antrean publik tanpa token jika akun token habis kuotanya
+      } else if (isQuota && tokens.length > 0 && attempts >= maxAttempts) {
+        // Semua token akun sudah dicoba dan kehabisan kuota. Coba antrean publik ZeroGPU
         try {
-          onStatusUpdate?.("Semua token akun telah dicoba. Mencoba antrean publik ZeroGPU (tanpa token)...");
+          onStatusUpdate?.("Semua kuota token akun telah dicoba. Mencoba antrean publik ZeroGPU (tanpa token)...");
           const pubResult = await callGradioModernSSE(spaceHost, endpoint, payloadData, undefined, onStatusUpdate);
           return await extractImageFromGradioOutput(pubResult, spaceHost, undefined);
         } catch (pubErr) {
@@ -1003,7 +1028,7 @@ export const generateWithHuggingFaceSpace = async (
   }
 
   const errDetail = lastError?.message || String(lastError);
-  if (isQuotaOrLimitError(lastError) || tokens.length > 0) {
+  if (isQuotaOrLimitError(lastError)) {
     throw new Error(`Semua kuota ZeroGPU akun Hugging Face Anda telah habis (${tokens.length} akun dicek). Silakan ganti atau tambahkan token akun lain di Pengaturan.`);
   }
 
