@@ -41,6 +41,9 @@ export interface GradioInputComponent {
 export const DEFAULT_QWEN_SPACE_URL = 'https://huggingface.co/spaces/bennie2390/Qwen-Image-Edit-Rapid-AIO-Loras-Experimental';
 export const DEFAULT_QWEN_SPACE_HOST = 'https://bennie2390-qwen-image-edit-rapid-aio-loras-experimental.hf.space';
 
+export const DEFAULT_WAN_VIDEO_SPACE_URL = 'https://huggingface.co/spaces/Ben2390/Wan_2.2_I2V_Studio-2';
+export const DEFAULT_WAN_VIDEO_SPACE_HOST = 'https://ben2390-wan-2-2-i2v-studio-2.hf.space';
+
 // Memory cache untuk tracking token aktif agar rotasi berlanjut antar-request
 let currentTokenIndex = 0;
 const exhaustedTokensMap = new Map<string, number>(); // token -> timestamp saat limit (TTL 2 jam)
@@ -163,6 +166,9 @@ export const normalizeHFSpaceUrl = async (rawUrl?: string): Promise<string> => {
     }
     if (owner.toLowerCase() === 'qwen' && repo.toLowerCase() === 'qwen-image-edit') {
       return 'https://qwen-qwen-image-edit.hf.space';
+    }
+    if (owner.toLowerCase() === 'ben2390' && repo.toLowerCase().includes('wan')) {
+      return DEFAULT_WAN_VIDEO_SPACE_HOST;
     }
     
     // Coba resolve host asli via API Hugging Face melalui proxy
@@ -1125,5 +1131,299 @@ export const testHuggingFaceSpace = async (
       activeTokenCount: tokens.length
     };
   }
+};
+
+/**
+ * Membangun 56-elemen payload array terurut untuk endpoint generate_video di Wan 2.2 I2V Studio-2
+ */
+export const buildWanVideoPayload = (
+  formattedStartImage: any,
+  formattedEndImage: any | null,
+  prompt: string,
+  durationSeconds: number = 5.0,
+  frameMultiplier: number = 64
+): any[] => {
+  const defaultNegativePrompt = "色调艳丽, 过曝, 静态, 细节模糊不清, 字幕, 风格, 作品, 画作, 画面, 静止, 整体发灰, 最差质量, 低质量, JPEG压缩残留, 丑陋的, 残缺的, 多余的手指, 画得不好的手部, 画得不好的脸部, 畸形的, 毁容的, 形态畸形的肢体, 手指融合, 静止不动的画面, 杂乱的背景, 三条腿, 背景人很多, 倒着走";
+
+  return [
+    formattedStartImage,                          // 0: input_image_component (Start Frame)
+    formattedEndImage || null,                    // 1: last_image_component (End Frame, optional)
+    prompt,                                       // 2: prompt_input (Video Prompt)
+    6,                                            // 3: steps_slider (default 6 steps)
+    defaultNegativePrompt,                        // 4: negative_prompt_input
+    durationSeconds,                              // 5: duration_seconds_input (5.0s)
+    1.0,                                          // 6: guidance_scale_input (default 1)
+    1.0,                                          // 7: guidance_scale_2_input (default 1)
+    42,                                           // 8: seed_input (default 42)
+    true,                                         // 9: randomize_seed_checkbox (true)
+    6,                                            // 10: quality_slider (default 6)
+    "UniPCMultistep",                             // 11: scheduler_dropdown
+    3.0,                                          // 12: flow_shift_slider (default 3.0)
+    frameMultiplier,                              // 13: frame_multi (64 fps)
+    false,                                        // 14: safe_mode_checkbox (default false)
+    "crop",                                       // 15: aspect_mode ("crop")
+    "Built-in Lightning · 6 steps (balanced)",    // 16: speed_preset_dd
+    1.0,                                          // 17: speed_high_scale
+    1.0,                                          // 18: speed_low_scale
+    "(None)", 0.7, 0.7,                           // 19, 20, 21: lora1
+    "(None)", 0.7, 0.7,                           // 22, 23, 24: lora2
+    "(None)", 0.7, 0.7,                           // 25, 26, 27: lora3
+    "", "(None)", 1.0, "(None)", 1.0,             // 28-32: my1
+    "", "(None)", 1.0, "(None)", 1.0,             // 33-37: my2
+    "", "(None)", 1.0, "(None)", 1.0,             // 38-42: my3
+    "", "(None)", 1.0, "(None)", 1.0,             // 43-47: my4
+    "", "(None)", 1.0, "(None)", 1.0,             // 48-52: my5
+    null,                                         // 53: identity_ref_component
+    0.45,                                         // 54: identity_strength_slider
+    true                                          // 55: play_result_video
+  ];
+};
+
+/**
+ * Inspeksi endpoint video generation di Space Wan 2.2 I2V Studio-2
+ */
+export const inspectWanVideoEndpoint = async (
+  spaceHost: string,
+  token?: string
+): Promise<{ endpoint: string }> => {
+  try {
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const configResp = await proxyFetch(`${spaceHost}/config`, { headers });
+    if (configResp.ok) {
+      const text = await configResp.text();
+      if (text.startsWith('{')) {
+        const cfg = JSON.parse(text);
+        if (Array.isArray(cfg.dependencies)) {
+          // Cari dependency dengan output video dan input komponen ~56 slot
+          const videoDep = cfg.dependencies.find((d: any) => {
+            const hasVideoOut = Array.isArray(d.outputs) && d.outputs.some((oid: number) => {
+              const comp = cfg.components?.find((c: any) => c.id === oid);
+              return comp?.type === 'video';
+            });
+            const hasManyInputs = Array.isArray(d.inputs) && d.inputs.length >= 40;
+            return hasVideoOut && hasManyInputs;
+          });
+
+          if (videoDep) {
+            if (videoDep.api_name) {
+              return { endpoint: `/${videoDep.api_name.replace(/^\/+/, '')}` };
+            }
+            const depIndex = cfg.dependencies.indexOf(videoDep);
+            const fnIdx = videoDep.id !== undefined ? videoDep.id : depIndex;
+            return { endpoint: `/${fnIdx}` };
+          }
+
+          const anyVideoDep = cfg.dependencies.find((d: any) => {
+            return Array.isArray(d.outputs) && d.outputs.some((oid: number) => {
+              const comp = cfg.components?.find((c: any) => c.id === oid);
+              return comp?.type === 'video';
+            });
+          });
+          if (anyVideoDep) {
+            if (anyVideoDep.api_name) {
+              return { endpoint: `/${anyVideoDep.api_name.replace(/^\/+/, '')}` };
+            }
+            const depIndex = cfg.dependencies.indexOf(anyVideoDep);
+            return { endpoint: `/${anyVideoDep.id !== undefined ? anyVideoDep.id : depIndex}` };
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[WanVideo] inspectWanVideoEndpoint fallback:", e);
+  }
+
+  return { endpoint: '/generate_video' };
+};
+
+/**
+ * Ekstrak output video MP4 dari respons Gradio
+ */
+export const extractVideoFromGradioOutput = async (
+  rawResult: any,
+  spaceHost: string,
+  token?: string
+): Promise<string> => {
+  if (!rawResult) {
+    throw new Error("Gradio tidak mengembalikan output video.");
+  }
+
+  let videoRef: any = null;
+
+  if (Array.isArray(rawResult)) {
+    for (const item of rawResult) {
+      if (!item) continue;
+      if (typeof item === 'string' && (item.endsWith('.mp4') || item.includes('/file=') || item.startsWith('http') || item.startsWith('data:video'))) {
+        videoRef = item;
+        break;
+      }
+      if (typeof item === 'object') {
+        if (item.video) {
+          videoRef = item.video;
+          break;
+        }
+        if (item.path && (item.path.endsWith('.mp4') || item.path.includes('wan22') || item.orig_name?.endsWith('.mp4'))) {
+          videoRef = item;
+          break;
+        }
+        if (item.url && (item.url.includes('.mp4') || item.url.includes('file='))) {
+          videoRef = item;
+          break;
+        }
+      }
+    }
+    if (!videoRef && rawResult.length > 0) {
+      videoRef = rawResult[0]?.video || rawResult[0]?.path || rawResult[0]?.url || rawResult[0] || rawResult[1];
+    }
+  } else if (typeof rawResult === 'object') {
+    videoRef = rawResult.video || rawResult.path || rawResult.url || rawResult;
+  } else if (typeof rawResult === 'string') {
+    videoRef = rawResult;
+  }
+
+  let targetUrl = '';
+  if (typeof videoRef === 'object' && videoRef !== null) {
+    if (videoRef.url) {
+      targetUrl = videoRef.url;
+    } else if (videoRef.path) {
+      targetUrl = `${spaceHost}/gradio_api/file=${videoRef.path}`;
+    }
+  } else if (typeof videoRef === 'string') {
+    if (videoRef.startsWith('http://') || videoRef.startsWith('https://') || videoRef.startsWith('data:')) {
+      targetUrl = videoRef;
+    } else if (videoRef.startsWith('/')) {
+      targetUrl = `${spaceHost}/gradio_api/file=${videoRef}`;
+    } else {
+      targetUrl = `${spaceHost}/gradio_api/file=${videoRef}`;
+    }
+  }
+
+  if (!targetUrl) {
+    throw new Error("Gagal mengekstrak URL video dari respons Space.");
+  }
+
+  if (targetUrl.startsWith('data:')) {
+    return targetUrl;
+  }
+
+  try {
+    const dataUrl = await fetchUrlToDataUrl(targetUrl, token);
+    return dataUrl;
+  } catch (err) {
+    console.warn("[WanVideo] Gagal convert video URL ke dataUrl, menggunakan direct URL:", err);
+    return targetUrl;
+  }
+};
+
+export interface GenerateWanVideoParams {
+  startImage: string;
+  endImage?: string | null;
+  prompt: string;
+  duration?: number; // 5.0 detik
+  fps?: number; // 64
+  spaceUrl?: string;
+  tokens?: string;
+  onStatusUpdate?: (status: string) => void;
+}
+
+/**
+ * Generate video menggunakan Hugging Face Space Wan 2.2 I2V Studio-2
+ */
+export const generateWanVideo = async (
+  params: GenerateWanVideoParams
+): Promise<string> => {
+  const {
+    startImage,
+    endImage,
+    prompt,
+    duration = 5.0,
+    fps = 64,
+    spaceUrl,
+    tokens: rawTokens,
+    onStatusUpdate
+  } = params;
+
+  if (!startImage) {
+    throw new Error("Start Frame (gambar awal) diperlukan untuk membuat video.");
+  }
+
+  const spaceHost = await normalizeHFSpaceUrl(spaceUrl || DEFAULT_WAN_VIDEO_SPACE_URL);
+  const tokens = parseHFTokens(rawTokens);
+
+  onStatusUpdate?.("Mendeteksi konfigurasi Space Wan 2.2...");
+  const { endpoint } = await inspectWanVideoEndpoint(spaceHost, tokens[0] || undefined);
+
+  const maxAttempts = Math.max(1, tokens.length);
+  let attempts = 0;
+  let lastError: any = null;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    const currentTokenObj = getNextAvailableToken(tokens);
+    const tokenToUse = currentTokenObj?.token || undefined;
+    const tokenDisplay = tokens.length > 0 
+      ? `(Akun #${currentTokenIndex + 1}/${tokens.length})` 
+      : '(Mode Publik / Tanpa Token)';
+
+    onStatusUpdate?.(`Menghubungkan ke Space Wan 2.2 ${tokenDisplay}...`);
+
+    try {
+      // 1. Upload Start Frame ke Gradio
+      onStatusUpdate?.("Mempersiapkan Start Frame...");
+      const formattedStart = await uploadToGradio(spaceHost, startImage, tokenToUse);
+      if (!formattedStart) {
+        throw new Error("Gagal mengunggah Start Frame ke Space.");
+      }
+
+      // 2. Upload End Frame ke Gradio (jika ada)
+      let formattedEnd: any = null;
+      if (endImage) {
+        onStatusUpdate?.("Mempersiapkan End Frame (optional)...");
+        try {
+          formattedEnd = await uploadToGradio(spaceHost, endImage, tokenToUse);
+        } catch (e) {
+          console.warn("[WanVideo] Gagal upload End Frame:", e);
+        }
+      }
+
+      // 3. Bangun payload 56 slot (Smoothness 64 FPS, Durasi 5.0 detik)
+      onStatusUpdate?.(`Menyiapkan parameter Wan 2.2 (Durasi ${duration}s, ${fps} FPS)...`);
+      const payloadData = buildWanVideoPayload(formattedStart, formattedEnd, prompt, duration, fps);
+
+      // 4. Kirim tugas video ke Space via Gradio Modern SSE
+      onStatusUpdate?.("Mengirim tugas video ke Space ZeroGPU (Wan 2.2)...");
+      const rawResult = await callGradioModernSSE(spaceHost, endpoint, payloadData, tokenToUse, onStatusUpdate);
+
+      // 5. Ekstrak video hasil render
+      onStatusUpdate?.("Menerima dan memproses video MP4 hasil render...");
+      const videoResult = await extractVideoFromGradioOutput(rawResult, spaceHost, tokenToUse);
+      return videoResult;
+
+    } catch (err: any) {
+      lastError = err;
+      const errMsg = err?.message || String(err);
+      console.warn(`[WanVideo] Percobaan ${attempts} (Akun #${currentTokenIndex + 1}) gagal:`, errMsg);
+
+      const isQuota = isQuotaOrLimitError(err);
+      if (isQuota && tokenToUse) {
+        markTokenExhausted(tokenToUse);
+      }
+
+      if (isQuota && tokens.length > 1 && attempts < maxAttempts) {
+        rotateToken(tokens, onStatusUpdate);
+        continue;
+      } else {
+        break;
+      }
+    }
+  }
+
+  const errDetail = lastError?.message || String(lastError);
+  if (isQuotaOrLimitError(lastError)) {
+    throw new Error(`Semua kuota ZeroGPU akun Hugging Face Anda telah habis (${tokens.length} akun dicek). Silakan ganti atau tambahkan token akun lain di Pengaturan.`);
+  }
+
+  throw new Error(`Gagal menghasilkan video di Wan 2.2 Space: ${errDetail}`);
 };
 

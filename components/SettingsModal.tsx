@@ -1106,6 +1106,37 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                               </p>
                             </div>
 
+                            {/* Wan 2.2 Video Space URL */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between select-none">
+                                <span className={`text-[9px] font-bold ${dynamicMutedTextColor} uppercase tracking-wider`}>
+                                  Wan 2.2 Video Space URL (I2V Studio-2)
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateGlobalGemini({ 
+                                    hfVideoSpaceUrl: 'https://huggingface.co/spaces/Ben2390/Wan_2.2_I2V_Studio-2'
+                                  })}
+                                  className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border border-violet-500/40 bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 transition-all"
+                                  title="Reset ke Space Default Ben2390 Wan 2.2"
+                                >
+                                  Ben2390 Wan 2.2 (Default)
+                                </button>
+                              </div>
+                              <input
+                                type="text"
+                                className={`w-full p-2 text-xs font-mono rounded-xl border ${
+                                  !userProfile.hfVideoSpaceUrl ? 'border-violet-500/50' : dynamicBorderColor
+                                } ${isBackgroundDark ? 'bg-black/20 text-white' : 'bg-white/60 text-black'} outline-none focus:border-violet-400/60 transition-all`}
+                                placeholder="https://huggingface.co/spaces/Ben2390/Wan_2.2_I2V_Studio-2"
+                                value={userProfile.hfVideoSpaceUrl ?? 'https://huggingface.co/spaces/Ben2390/Wan_2.2_I2V_Studio-2'}
+                                onChange={(e) => updateGlobalGemini({ hfVideoSpaceUrl: e.target.value })}
+                              />
+                              <p className={`text-[8px] ${dynamicMutedTextColor} leading-relaxed`}>
+                                🎬 <strong>Wan 2.2 I2V Studio-2:</strong> Generator Video Image-to-Video (5 detik, 64 FPS). Menggunakan ZeroGPU dan token HF akun Anda secara otomatis.
+                              </p>
+                            </div>
+
                             {/* Multi-Tokens Input */}
                             <div className="space-y-1.5">
                               <div className="flex items-center justify-between select-none">

@@ -4,6 +4,7 @@ import { AgentConfig, ChatMessage, Attachment, UserProfile, GlobalAppearance, Ac
 import { generateAgentResponse, getSpeech, generatePAP, cleanResponseText, generateErrorMessage, reviseAgentResponseBasedOnImage, generateSmartTitle, isTtsModelStreamSupported, getActiveTtsModel, cleanRawCaptionToPureGarment, regeneratePapVariation, getAllGeminiApiKeys } from '../services/geminiService';
 import { triggerNewMessageNotification } from '../services/notificationService';
 import ImageInfoModal from './ImageInfoModal';
+import WanVideoModal from './WanVideoModal';
 
 
 const decodeBase64 = (base64: string) => {
@@ -602,6 +603,24 @@ const ChatView: React.FC<ChatViewProps> = ({
     imageUrl: null,
   });
 
+  const [videoModalData, setVideoModalData] = useState<{
+    isOpen: boolean;
+    startImage: string | null;
+    prompt: string;
+  }>({
+    isOpen: false,
+    startImage: null,
+    prompt: ''
+  });
+
+  const handleOpenVideoModal = (startImg?: string | null, initialPrompt?: string) => {
+    setVideoModalData({
+      isOpen: true,
+      startImage: startImg || null,
+      prompt: initialPrompt || ''
+    });
+  };
+
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcriptText, setTranscriptText] = useState('');
 
@@ -610,6 +629,7 @@ const ChatView: React.FC<ChatViewProps> = ({
     setShowProfilePreview(false);
     setShowGallery(false);
     setImageInfoData(prev => ({ ...prev, isOpen: false }));
+    setVideoModalData(prev => ({ ...prev, isOpen: false }));
     setShowTranscript(false);
   };
 
@@ -621,7 +641,7 @@ const ChatView: React.FC<ChatViewProps> = ({
   };
 
   // Media Preview Back Button Handler (Android / Browser Back)
-  const isAnyModalOpen = Boolean(previewMedia || showProfilePreview || showGallery || imageInfoData.isOpen || showTranscript);
+  const isAnyModalOpen = Boolean(previewMedia || showProfilePreview || showGallery || imageInfoData.isOpen || showTranscript || videoModalData.isOpen);
 
   useEffect(() => {
     if (isAnyModalOpen) {
@@ -931,6 +951,17 @@ const ChatView: React.FC<ChatViewProps> = ({
           timestamp: m.timestamp 
         });
       }
+      if (m.video) {
+        const vidIndex = activeThread.filter((msg, i) => i <= activeThread.indexOf(m) && msg.video).length;
+        items.push({ 
+          type: 'video', 
+          data: m.video, 
+          name: 'Video Wan 2.2', 
+          fileName: `wan22_${agentName}_${dateStr}_${vidIndex}.mp4`,
+          id: m.id, 
+          timestamp: m.timestamp 
+        });
+      }
       if (m.attachments) {
         m.attachments.forEach(att => {
           if (att.mimeType.startsWith('image/') || att.mimeType.startsWith('video/') || att.mimeType.startsWith('audio/')) {
@@ -954,6 +985,49 @@ const ChatView: React.FC<ChatViewProps> = ({
       return items;
     }).sort((a, b) => a.timestamp - b.timestamp);
   }, [activeThread, config.name]);
+
+  const chatHistoryImages = useMemo(() => {
+    const list: { url: string; prompt?: string }[] = [];
+    const seen = new Set<string>();
+    for (const msg of activeThread) {
+      if (msg.image && !seen.has(msg.image)) {
+        seen.add(msg.image);
+        list.push({ url: msg.image, prompt: msg.imagePrompt || msg.outfit || msg.text });
+      }
+      if (msg.images) {
+        for (const img of msg.images) {
+          if (img && !seen.has(img)) {
+            seen.add(img);
+            list.push({ url: img, prompt: msg.imagePrompt || msg.outfit || msg.text });
+          }
+        }
+      }
+      if (msg.attachments) {
+        for (const att of msg.attachments) {
+          if (att.mimeType.startsWith('image/') && att.data && !seen.has(att.data)) {
+            seen.add(att.data);
+            list.push({ url: att.data, prompt: att.name });
+          }
+        }
+      }
+    }
+    return list;
+  }, [activeThread]);
+
+  const handleVideoGeneratedFromModal = (videoUrl: string, promptStr: string, startImg: string, durationSec: number = 5.0) => {
+    const newMsg: ChatMessage = {
+      id: `msg-vid-${Date.now()}`,
+      role: 'agent',
+      text: `Ini hasil video Wan 2.2 untukmu sayang! 🎬✨ (Durasi ${durationSec.toFixed(1)}s · Smoothness 64 FPS)`,
+      video: videoUrl,
+      videoPrompt: promptStr,
+      videoDuration: durationSec,
+      image: startImg,
+      timestamp: Date.now(),
+      agentId: config.id
+    };
+    addMessageToAgent(config.id || 'default', newMsg, true);
+  };
 
   const currentMediaIndex = useMemo(() => {
     if (!previewMedia) return -1;
@@ -2632,6 +2706,11 @@ const ChatView: React.FC<ChatViewProps> = ({
                           agentName: config.name
                         });
                       }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Informasi Gambar"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></button>
+
+                      <button onClick={(e) => { 
+                        e.stopPropagation(); 
+                        handleOpenVideoModal(m.image!, m.imagePrompt || m.outfit || m.text);
+                      }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Buat Video (Wan 2.2 I2V)"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
                     </div>
 
                     {/* Mini Variation Navigation on Chat Bubble Image */}
@@ -2685,6 +2764,38 @@ const ChatView: React.FC<ChatViewProps> = ({
                         </button>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Video Bubble Display */}
+                {m.video && (
+                  <div className={`mb-4 overflow-hidden rounded-2xl border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'} relative group/video bg-black/70 shadow-2xl`}>
+                    <video 
+                      src={m.video} 
+                      controls 
+                      playsInline
+                      className="w-full max-h-96 object-contain rounded-2xl bg-black" 
+                    />
+                    <div className="p-3 bg-black/60 backdrop-blur-md flex items-center justify-between text-xs text-white/90 border-t border-white/10">
+                      <div className="flex items-center gap-2 font-mono text-[10px]">
+                        <span className="px-2 py-0.5 rounded-full bg-violet-600/40 text-violet-300 border border-violet-500/50 font-bold uppercase tracking-wider">
+                          🎬 Wan 2.2 Video
+                        </span>
+                        <span className="text-white/60 font-medium">64 FPS · {m.videoDuration ? `${m.videoDuration.toFixed(1)}s` : '5.0s'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => downloadMedia(m.video!, `wan22_${getSafeAgentName()}_${Date.now()}.mp4`, 'video/mp4')}
+                          className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-[10px] font-bold text-white transition-all flex items-center gap-1 cursor-pointer"
+                          title="Unduh Video MP4"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Unduh MP4
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -3048,6 +3159,22 @@ const ChatView: React.FC<ChatViewProps> = ({
               <input type="file" className="hidden" multiple accept="image/*,video/*,audio/*,.pdf,.txt" onChange={e => handleFiles(e.target.files)} />
               <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${dynamicIconColor}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </label>
+            <button 
+              type="button"
+              onClick={() => {
+                const lastImageMsg = [...activeThread].reverse().find(msg => msg.image);
+                handleOpenVideoModal(
+                  lastImageMsg?.image || attachedFiles.find(f => f.mimeType.startsWith('image/'))?.data || null, 
+                  lastImageMsg?.imagePrompt || ''
+                );
+              }}
+              className={`p-3 mb-0.5 hover:bg-white/10 rounded-full transition-all active:scale-90 flex items-center justify-center shrink-0 ${dynamicIconColor}`}
+              title="Wan 2.2 Video Studio (Image-to-Video)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
             <button 
               onClick={toggleVoiceToText} 
               className={`p-3 mb-0.5 rounded-full transition-all active:scale-90 flex items-center justify-center shrink-0 ${isListening ? `text-white animate-pulse` : `hover:bg-white/10 ${dynamicIconColor}`}`}
@@ -3988,6 +4115,21 @@ const ChatView: React.FC<ChatViewProps> = ({
         agentName={imageInfoData.agentName || config.name}
         isBackgroundDark={isBackgroundDark}
         themeHex={themeHex}
+        onGenerateVideo={(imgUrl, pr) => handleOpenVideoModal(imgUrl, pr)}
+      />
+
+      {/* Wan 2.2 Video Studio Modal */}
+      <WanVideoModal
+        isOpen={videoModalData.isOpen}
+        onClose={() => setVideoModalData(prev => ({ ...prev, isOpen: false }))}
+        initialStartImage={videoModalData.startImage}
+        initialPrompt={videoModalData.prompt}
+        userProfile={userProfile}
+        agentConfig={config}
+        themeHex={themeHex}
+        isBackgroundDark={isBackgroundDark}
+        chatHistoryImages={chatHistoryImages}
+        onVideoGenerated={handleVideoGeneratedFromModal}
       />
 
       {isProcessingMetadata && <MetadataOverlay status={metadataStatus} />}

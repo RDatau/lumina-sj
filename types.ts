@@ -47,6 +47,9 @@ export interface ChatMessage {
     model?: string;
     aspectRatio?: string;
   };
+  video?: string; // Menyimpan base64 data atau URL video MP4 yang dihasilkan
+  videoPrompt?: string; // Menyimpan prompt yang digunakan untuk generate video
+  videoDuration?: number; // Durasi video dalam detik (Wan 2.2)
   attachments?: Attachment[]; // Array untuk berbagai jenis file
   audio?: string; // Menyimpan base64 audio data untuk TTS
   timestamp: number;
@@ -92,6 +95,7 @@ export interface GlobalGeminiSettings {
   imageModel: string;
   useGoogleSearch: boolean;
   hfSpaceUrl?: string;
+  hfVideoSpaceUrl?: string;
   hfTokens?: string;
   hfApiEndpoint?: string;
   injectNegativePrompt?: boolean;
@@ -117,6 +121,7 @@ export interface UserProfile {
   voiceCall?: string;
   isEnrichPersonaEnabled?: boolean;
   hfSpaceUrl?: string;
+  hfVideoSpaceUrl?: string;
   hfTokens?: string;
   hfApiEndpoint?: string;
   injectNegativePrompt?: boolean;
@@ -141,7 +146,7 @@ export interface ActiveGenerationTask {
   agentId: string;
   agentName: string;
   agentPic?: string | null;
-  type: 'text' | 'pap' | 'audio';
+  type: 'text' | 'pap' | 'audio' | 'video';
   statusText: string;
   startedAt: number;
 }

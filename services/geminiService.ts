@@ -2,9 +2,10 @@
 import { GoogleGenAI, Modality, ThinkingLevel } from "@google/genai";
 import { AgentConfig, Attachment, ChatMessage, UserProfile } from "../types";
 import { convertPcmToMp3, addMetadataToMp3 } from "./audioMetadata";
-import { getStoredGlobalGeminiSettings, getEffectiveGlobalGeminiSettings, DEFAULT_GLOBAL_GEMINI_SETTINGS, DEFAULT_QWEN_SPACE_URL } from "./dbService";
+import { getStoredGlobalGeminiSettings, getEffectiveGlobalGeminiSettings, DEFAULT_GLOBAL_GEMINI_SETTINGS, DEFAULT_QWEN_SPACE_URL, DEFAULT_WAN_VIDEO_SPACE_URL } from "./dbService";
 import { 
   generateWithHuggingFaceSpace, 
+  generateWanVideo,
   fetchUrlToDataUrl, 
   QWEN_IDENTITY_BASE, 
   QWEN_IDENTITY_EMPHASIS, 
@@ -1950,6 +1951,59 @@ CRITICAL INSTRUCTIONS:
   }
 
   return prompt;
+};
+
+/**
+ * Memanfaatkan AI Gemini untuk menyusun prompt video sinematik berkualitas tinggi
+ * khusus untuk Wan 2.2 Image-to-Video:
+ * - Menganalisis aksi, gerakan subjek, ekspresi, pencahayaan, dan kamera.
+ * - Format bahasa prompt photographic/cinematic natural English.
+ */
+export const generateVideoPromptWithAI = async (
+  userRequest: string,
+  characterContext?: string,
+  userProfile?: UserProfile
+): Promise<string> => {
+  const fallback = "cinematic motion, slow camera zoom in, character smiling gently while looking at the camera, soft natural lighting, high resolution, fluid motion, 4k photorealistic";
+  if (!userRequest && !characterContext) return fallback;
+
+  try {
+    const ai = createGeminiClient(userProfile);
+    const textModel = getActiveTextModel(userProfile);
+
+    const promptInstruction = `You are an expert AI Video Director and Prompt Engineer for Wan 2.2 Image-to-Video.
+Your mission is to transform the user's request and character context into a concise, vivid cinematic motion prompt.
+
+RULES:
+1. Describe the dynamic motion in English: character movement, gestures, subtle body motions, facial expression changes (e.g. slow head turn, gentle smile, eye gaze), and camera movement (e.g. slow push in, gentle handheld, subtle camera orbit).
+2. Keep it natural and physically plausible for Wan 2.2 I2V.
+3. Include visual quality anchors: "cinematic motion, smooth animation, photorealistic, natural skin texture, consistent anatomy".
+4. Length: 1 to 2 crisp, fluid English sentences (under 60 words).
+5. Output ONLY the English prompt. Do NOT include markdown code blocks, quotes, or conversational explanations.`;
+
+    const response = await ai.models.generateContent({
+      model: textModel,
+      contents: [{
+        parts: [{
+          text: `${promptInstruction}\n\nUSER REQUEST: "${userRequest || 'animate this image'}"\nCHARACTER / SCENE CONTEXT: "${characterContext || ''}"`
+        }]
+      }],
+      config: {
+        temperature: 0.7,
+        maxOutputTokens: 250,
+        safetySettings: safetySettings as any,
+      }
+    });
+
+    const result = response.text?.trim().replace(/^["']|["']$/g, '');
+    if (result && result.length > 10) {
+      return result;
+    }
+  } catch (e) {
+    console.warn("[VideoPrompt AI] Fallback due to error:", e);
+  }
+
+  return fallback;
 };
 
 export const generatePAP = async (

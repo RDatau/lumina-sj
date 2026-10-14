@@ -1,6 +1,7 @@
 import { AgentConfig, ChatMessage, ChatSession, CallHistory, UserProfile, GlobalAppearance, GlobalGeminiSettings } from '../types';
 
 export const DEFAULT_QWEN_SPACE_URL = 'https://huggingface.co/spaces/bennie2390/Qwen-Image-Edit-Rapid-AIO-Loras-Experimental';
+export const DEFAULT_WAN_VIDEO_SPACE_URL = 'https://huggingface.co/spaces/Ben2390/Wan_2.2_I2V_Studio-2';
 
 export const DEFAULT_GLOBAL_GEMINI_SETTINGS: GlobalGeminiSettings = {
   geminiApiKey: '',
@@ -12,6 +13,7 @@ export const DEFAULT_GLOBAL_GEMINI_SETTINGS: GlobalGeminiSettings = {
   imageModel: 'hf-qwen-image-edit',
   useGoogleSearch: false,
   hfSpaceUrl: DEFAULT_QWEN_SPACE_URL,
+  hfVideoSpaceUrl: DEFAULT_WAN_VIDEO_SPACE_URL,
   hfTokens: '',
   hfApiEndpoint: '/infer',
   injectNegativePrompt: true,
@@ -57,6 +59,12 @@ export const getEffectiveGlobalGeminiSettings = (dbSettings?: Partial<GlobalGemi
       const raw = ((local.hfSpaceUrl && local.hfSpaceUrl.trim()) ? local.hfSpaceUrl : (dbSettings?.hfSpaceUrl || '')).trim();
       return (!raw || raw === 'https' || raw === 'https://' || raw === 'http' || raw === 'http://')
         ? DEFAULT_QWEN_SPACE_URL
+        : raw;
+    })(),
+    hfVideoSpaceUrl: (() => {
+      const raw = ((local.hfVideoSpaceUrl && local.hfVideoSpaceUrl.trim()) ? local.hfVideoSpaceUrl : (dbSettings?.hfVideoSpaceUrl || '')).trim();
+      return (!raw || raw === 'https' || raw === 'https://' || raw === 'http' || raw === 'http://')
+        ? DEFAULT_WAN_VIDEO_SPACE_URL
         : raw;
     })(),
     hfTokens: ((local.hfTokens && local.hfTokens.trim()) ? local.hfTokens : (dbSettings?.hfTokens || '')).trim(),

@@ -13,6 +13,7 @@ interface ImageInfoModalProps {
   isBackgroundDark?: boolean;
   themeHex?: string;
   agentName?: string;
+  onGenerateVideo?: (imageUrl: string, prompt?: string) => void;
 }
 
 export const ImageInfoModal: React.FC<ImageInfoModalProps> = ({
@@ -26,7 +27,8 @@ export const ImageInfoModal: React.FC<ImageInfoModalProps> = ({
   timestamp,
   isBackgroundDark = true,
   themeHex = '#ec4899',
-  agentName
+  agentName,
+  onGenerateVideo
 }) => {
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -726,14 +728,29 @@ export const ImageInfoModal: React.FC<ImageInfoModalProps> = ({
         </div>
 
         {/* 3. Tombol Bawah Tetap (Fixed Footer Button) */}
-        <div className="pt-3 border-t border-white/10 shrink-0 mt-3">
+        <div className="pt-3 border-t border-white/10 shrink-0 mt-3 flex items-center gap-2">
+          {onGenerateVideo && imageUrl && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onGenerateVideo(imageUrl, effectivePrompt);
+              }}
+              className="flex-1 py-2.5 md:py-3 rounded-2xl font-bold text-xs uppercase tracking-wider text-white shadow-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              style={{
+                background: `linear-gradient(135deg, ${themeHex}, #8b5cf6)`,
+                boxShadow: `0 4px 15px ${themeHex}40`
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span>Buat Video (Wan 2.2)</span>
+            </button>
+          )}
           <button
             onClick={onClose}
-            className="w-full py-2.5 md:py-3 rounded-2xl font-bold text-xs uppercase tracking-wider text-white shadow-lg transition-all active:scale-95 cursor-pointer"
-            style={{
-              backgroundColor: themeHex,
-              boxShadow: `0 8px 20px ${themeHex}40`
-            }}
+            className={`${onGenerateVideo && imageUrl ? 'px-6' : 'w-full'} py-2.5 md:py-3 rounded-2xl font-bold text-xs uppercase tracking-wider text-white bg-white/10 hover:bg-white/20 transition-all active:scale-95 cursor-pointer`}
           >
             Tutup
           </button>
