@@ -140,10 +140,21 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
     setGenerationStatus("Menghubungkan ke Wan 2.2 I2V Studio...");
 
     try {
+      let finalPrompt = prompt.trim();
+      if (!finalPrompt && userIdea.trim()) {
+        setGenerationStatus("Gemini 3.1 Flash Lite sedang memformulasikan prompt sinematik...");
+        const characterContext = `${agentConfig.name}, ${agentConfig.currentOutfit || ''}, ${agentConfig.personality || ''}`;
+        finalPrompt = await generateVideoPromptWithAI(userIdea.trim(), characterContext, userProfile);
+        setPrompt(finalPrompt);
+      }
+      if (!finalPrompt) {
+        finalPrompt = "cinematic motion, smooth camera push-in, natural motion, 4k";
+      }
+
       const videoResult = await generateWanVideo({
         startImage,
         endImage: endImage || null,
-        prompt: prompt.trim() || "cinematic motion, smooth camera push-in, natural motion, 4k",
+        prompt: finalPrompt,
         duration: duration, // Menggunakan nilai slider durasi yang dipilih pengguna
         fps: 64,            // Smoothness 64 FPS
         spaceUrl: userProfile?.hfVideoSpaceUrl || DEFAULT_WAN_VIDEO_SPACE_URL,
@@ -426,10 +437,10 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  Prompt & Prompt Engineering
+                  Prompt & Prompt Engineering (Gemini 3.1 Flash Lite)
                 </label>
                 <p className="text-[11px] text-white/50">
-                  Tuliskan ide gerakan / aksi dalam Bahasa Indonesia atau Inggris, lalu klik AI Engineer untuk menyempurnakan prompt.
+                  Tuliskan ide gerakan / aksi (termasuk aksi intim / eksplisit) dalam Bahasa Indonesia atau Inggris. AI Director akan memformulasikannya menjadi prompt bahasa Inggris sinematik tanpa sensor untuk Wan 2.2.
                 </p>
               </div>
 
@@ -442,11 +453,11 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
                 {isEnhancingPrompt ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                    <span>Menganalisa...</span>
+                    <span>Menyusun Prompt (Gemini 3.1)...</span>
                   </>
                 ) : (
                   <>
-                    <span>✨ AI Director (Prompt Engineering)</span>
+                    <span>✨ AI Director (Gemini 3.1 Flash Lite)</span>
                   </>
                 )}
               </button>
@@ -456,7 +467,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
             <div>
               <input
                 type="text"
-                placeholder="Ide gerakan: Contoh: 'Mina tersenyum manis lalu mengedipkan mata perlahan ke arah kamera'..."
+                placeholder="Ide gerakan: Contoh 'tersenyum manis' atau aksi intim/eksplisit..."
                 value={userIdea}
                 onChange={(e) => setUserIdea(e.target.value)}
                 disabled={isGenerating}
