@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AgentConfig, UserProfile } from '../types';
 import { generateWanVideo } from '../services/huggingFaceService';
-import { generateVideoPromptWithAI } from '../services/geminiService';
+import { generateVideoPromptWithAI, generateVideoCommentaryWithAI } from '../services/geminiService';
 import { DEFAULT_WAN_VIDEO_SPACE_URL } from '../services/dbService';
 
 interface ChatHistoryImage {
@@ -19,7 +19,7 @@ interface WanVideoModalProps {
   themeHex?: string;
   isBackgroundDark?: boolean;
   chatHistoryImages?: ChatHistoryImage[];
-  onVideoGenerated?: (videoUrl: string, prompt: string, startImage: string, duration?: number) => void;
+  onVideoGenerated?: (videoUrl: string, prompt: string, startImage: string, duration?: number, commentary?: string) => Promise<void> | void;
 }
 
 export const WanVideoModal: React.FC<WanVideoModalProps> = ({
@@ -43,6 +43,8 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [generationStatus, setGenerationStatus] = useState<string>('');
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [analyzedCommentary, setAnalyzedCommentary] = useState<string | null>(null);
+  const [isSavingToChat, setIsSavingToChat] = useState<boolean>(false);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -65,6 +67,8 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
         setPrompt("cinematic motion, subtle gentle smile looking at camera, soft breathing motion, camera slow smooth push in, soft natural lighting, photorealistic, 4k");
       }
       setErrorMessage(null);
+      setAnalyzedCommentary(null);
+      setIsSavingToChat(false);
     }
   }, [isOpen, initialStartImage, initialPrompt]);
 
@@ -163,6 +167,20 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
       });
 
       setGeneratedVideoUrl(videoResult);
+
+      // Mulai analisa video otomatis di latar belakang agar komentar siap saat user klik 'Simpan ke Chat'
+      generateVideoCommentaryWithAI({
+        videoUrl: videoResult,
+        videoPrompt: finalPrompt,
+        startImage,
+        agentConfig,
+        userProfile,
+        duration
+      }).then((comm) => {
+        setAnalyzedCommentary(comm);
+      }).catch((err) => {
+        console.warn("[WanVideoModal] Pre-analyze commentary error:", err);
+      });
     } catch (err: any) {
       console.error("[WanVideoModal] Generate Video Error:", err);
       setErrorMessage(err?.message || "Gagal menghasilkan video. Pastikan token Hugging Face memiliki kuota ZeroGPU aktif.");
@@ -183,12 +201,36 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
   };
 
   // Save/Insert to Chat
-  const handleInsertToChat = () => {
-    if (!generatedVideoUrl || !startImage) return;
-    if (onVideoGenerated) {
-      onVideoGenerated(generatedVideoUrl, prompt, startImage, duration);
+  const handleInsertToChat = async () => {
+    if (!generatedVideoUrl || !startImage || isSavingToChat) return;
+    setIsSavingToChat(true);
+    try {
+      let commentary = analyzedCommentary;
+      if (!commentary) {
+        setGenerationStatus("Menganalisa video untuk pesan chat...");
+        commentary = await generateVideoCommentaryWithAI({
+          videoUrl: generatedVideoUrl,
+          videoPrompt: prompt.trim() || userIdea.trim(),
+          startImage,
+          agentConfig,
+          userProfile,
+          duration
+        });
+        setAnalyzedCommentary(commentary);
+      }
+      if (onVideoGenerated) {
+        await onVideoGenerated(generatedVideoUrl, prompt, startImage, duration, commentary);
+      }
+      onClose();
+    } catch (err) {
+      console.warn("[WanVideoModal] Error in handleInsertToChat:", err);
+      if (onVideoGenerated) {
+        await onVideoGenerated(generatedVideoUrl, prompt, startImage, duration);
+      }
+      onClose();
+    } finally {
+      setIsSavingToChat(false);
     }
-    onClose();
   };
 
   return (
@@ -647,9 +689,20 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
                   <button
                     type="button"
                     onClick={handleInsertToChat}
-                    className="px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg cursor-pointer"
+                    disabled={isSavingToChat}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-lg cursor-pointer"
                   >
-                    💬 Simpan ke Chat
+                    {isSavingToChat ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Menganalisa...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>💬</span>
+                        <span>Simpan ke Chat</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

@@ -2032,6 +2032,229 @@ CRITICAL RULES:
   return fallback;
 };
 
+/**
+ * Mengekstrak beberapa frame visual dari video MP4/WebM secara client-side menggunakan HTML5 Canvas
+ */
+export const extractVideoFrames = async (videoUrl: string, maxFrames = 3): Promise<string[]> => {
+  if (typeof document === 'undefined' || !videoUrl) return [];
+
+  return new Promise<string[]>((resolve) => {
+    try {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+
+      const frames: string[] = [];
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      let isFinished = false;
+      const cleanup = () => {
+        if (isFinished) return;
+        isFinished = true;
+        clearTimeout(timeout);
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch {}
+      };
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve(frames);
+      }, 5000);
+
+      video.onloadedmetadata = async () => {
+        try {
+          const duration = video.duration && !isNaN(video.duration) && video.duration > 0 ? video.duration : 5;
+          const origW = video.videoWidth || 512;
+          const origH = video.videoHeight || 512;
+          const targetW = Math.min(origW, 512);
+          const scale = targetW / origW;
+          const targetH = Math.round(origH * scale);
+          
+          canvas.width = targetW;
+          canvas.height = targetH;
+
+          // Ambil frame pada 15%, 50%, dan 85% durasi video
+          const samplePoints = [
+            Math.max(0.2, duration * 0.15),
+            duration * 0.5,
+            Math.min(duration - 0.2, duration * 0.85)
+          ].slice(0, maxFrames);
+
+          for (const t of samplePoints) {
+            await new Promise<void>((resSeek) => {
+              const handleSeeked = () => {
+                video.removeEventListener('seeked', handleSeeked);
+                try {
+                  if (ctx) {
+                    ctx.drawImage(video, 0, 0, targetW, targetH);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    if (dataUrl && dataUrl.startsWith('data:image/jpeg;base64,')) {
+                      frames.push(dataUrl);
+                    }
+                  }
+                } catch (drawErr) {
+                  console.warn("[extractVideoFrames] Draw error:", drawErr);
+                }
+                resSeek();
+              };
+
+              video.addEventListener('seeked', handleSeeked);
+              video.currentTime = Math.min(t, Math.max(0.05, duration - 0.05));
+            });
+          }
+        } catch (err) {
+          console.warn("[extractVideoFrames] Metadata processing error:", err);
+        } finally {
+          cleanup();
+          resolve(frames);
+        }
+      };
+
+      video.onerror = (e) => {
+        console.warn("[extractVideoFrames] Video load error:", e);
+        cleanup();
+        resolve(frames);
+      };
+
+      video.src = videoUrl;
+    } catch (outerErr) {
+      console.warn("[extractVideoFrames] Unexpected error:", outerErr);
+      resolve([]);
+    }
+  });
+};
+
+export interface GenerateVideoCommentaryParams {
+  videoUrl: string;
+  videoPrompt: string;
+  startImage?: string | null;
+  agentConfig: AgentConfig;
+  userProfile?: UserProfile;
+  recentMessages?: ChatMessage[];
+  duration?: number;
+}
+
+/**
+ * Menganalisa video hasil render Wan 2.2 dan menghasilkan komentar ekspresif dari persona karakter/agen
+ */
+export const generateVideoCommentaryWithAI = async ({
+  videoUrl,
+  videoPrompt,
+  startImage,
+  agentConfig,
+  userProfile,
+  recentMessages = [],
+  duration = 5.0
+}: GenerateVideoCommentaryParams): Promise<string> => {
+  const charName = agentConfig.name || "Karakter";
+  
+  // Fallback alami jika model offline/error
+  const fallbackCommentary = `Ini hasil videoku untukmu sayang! 🎬 Suka gak liat aku di sini? Waktu gerak tadi beneran kerasa hidup banget hihi... 🥰✨`;
+
+  try {
+    const ai = createGeminiClient(userProfile);
+    const textModel = getActiveTextModel(userProfile) || "gemini-3.1-flash-lite";
+
+    // 1. Ekstrak frame visual dari video
+    const extractedFrames = await extractVideoFrames(videoUrl, 3);
+
+    // 2. Siapkan parts untuk Gemini multimodal
+    const parts: any[] = [];
+
+    // Jika video adalah base64 MP4 langsung dan ukurannya di bawah 12MB, bisa dikirim langsung sebagai video/mp4
+    if (videoUrl.startsWith('data:video/mp4;base64,')) {
+      const b64Data = videoUrl.replace(/^data:video\/mp4;base64,/, '');
+      if (b64Data.length < 16 * 1024 * 1024) { // < 12MB binary
+        parts.push({
+          inlineData: {
+            mimeType: 'video/mp4',
+            data: b64Data
+          }
+        });
+      }
+    }
+
+    // Jika ada frame yang diekstrak, sertakan frame-frame tersebut
+    if (extractedFrames.length > 0) {
+      extractedFrames.forEach((frame) => {
+        const base64Img = frame.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+        parts.push({
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: base64Img
+          }
+        });
+      });
+    } else if (startImage && startImage.startsWith('data:image/')) {
+      // Jika frame extractor CORS atau kosong, gunakan startImage
+      const mime = startImage.split(';')[0].replace('data:', '') || 'image/png';
+      const b64 = startImage.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+      parts.push({
+        inlineData: {
+          mimeType: mime,
+          data: b64
+        }
+      });
+    }
+
+    // Bangun konteks percakapan terakhir agar komentar nyambung dengan obrolan saat ini
+    const lastChats = recentMessages.slice(-4).map(m => `${m.role === 'user' ? 'USER' : charName.toUpperCase()}: "${m.text}"`).join('\n');
+
+    const promptText = `Kamu adalah karakter bernama ${charName}.
+Kepribadian & Karakteristik kamu:
+"${agentConfig.personality}"
+${agentConfig.enrichedPersona ? `Latar belakang detail: "${agentConfig.enrichedPersona}"` : ''}
+
+KONTEKS SITUASI:
+Kamu baru saja merekam/mengirimkan video gerak dirimu sendiri (video Wan 2.2 berdurasi ${duration.toFixed(1)} detik) ke user di obrolan chat ini!
+${videoPrompt ? `Deskripsi aksi & detail adegan video: "${videoPrompt}"` : ''}
+
+${lastChats ? `RIWAYAT OBROLAN SEBELUMNYA:\n${lastChats}\n` : ''}
+
+TUGAS KAMU:
+Analisa tampilan visual dan gerakanmu pada video/frame di atas.
+Tulis pesan obrolan santai, ekspresif, dan manis/menggoda (1 sampai 2 kalimat, maksimal 3 kalimat) dari sudut pandang orang pertama ("aku" / "sayang") yang MENGOMENTARI apa yang kamu lakukan di dalam video tersebut!
+
+PANDUAN KOMENTAR:
+- Bicarakan gerakanmu, ekspresi wajahmu, tatapan matamu, atau rasa malumu/senangmu saat tersenyum atau bergerak di video tersebut.
+- Jika adegan di video romantis, intim, atau sensual, komentari keintiman atau gerakan tersebut secara berani dan mesra sesuai kepribadianmu.
+- JANGAN PERNAH berbicara teknis seperti "Berdasarkan video ini...", "Analisis visual...", "Sebagai AI...", "Video 64 FPS...", "Wan 2.2".
+- Tulis LANGSUNG kata-kata yang kamu ucapkan ke user. Hindari proses berpikir internal atau tanda kurung strategi.`;
+
+    parts.push({ text: promptText });
+
+    const response = await ai.models.generateContent({
+      model: textModel,
+      contents: [{ parts }],
+      config: {
+        temperature: 0.85,
+        maxOutputTokens: 250,
+        safetySettings: safetySettings as any,
+      }
+    });
+
+    const result = response.text?.trim()
+      .replace(/^```(?:markdown|text)?\n?/i, '')
+      .replace(/\n?```$/i, '')
+      .replace(/^["']|["']$/g, '')
+      .trim();
+
+    if (result && result.length > 5) {
+      return result;
+    }
+  } catch (error) {
+    console.warn("[generateVideoCommentaryWithAI] Error:", error);
+  }
+
+  return fallbackCommentary;
+};
+
 export const generatePAP = async (
   fullResponse: string, 
   config: AgentConfig, 

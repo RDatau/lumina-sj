@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AgentConfig, ChatMessage, Attachment, UserProfile, GlobalAppearance, ActiveGenerationTask, AppState } from '../types';
-import { generateAgentResponse, getSpeech, generatePAP, cleanResponseText, generateErrorMessage, reviseAgentResponseBasedOnImage, generateSmartTitle, isTtsModelStreamSupported, getActiveTtsModel, cleanRawCaptionToPureGarment, regeneratePapVariation, getAllGeminiApiKeys } from '../services/geminiService';
+import { generateAgentResponse, getSpeech, generatePAP, cleanResponseText, generateErrorMessage, reviseAgentResponseBasedOnImage, generateSmartTitle, isTtsModelStreamSupported, getActiveTtsModel, cleanRawCaptionToPureGarment, regeneratePapVariation, getAllGeminiApiKeys, generateVideoCommentaryWithAI } from '../services/geminiService';
 import { triggerNewMessageNotification } from '../services/notificationService';
 import ImageInfoModal from './ImageInfoModal';
 import WanVideoModal from './WanVideoModal';
@@ -1014,19 +1014,52 @@ const ChatView: React.FC<ChatViewProps> = ({
     return list;
   }, [activeThread]);
 
-  const handleVideoGeneratedFromModal = (videoUrl: string, promptStr: string, startImg: string, durationSec: number = 5.0) => {
+  const handleVideoGeneratedFromModal = async (
+    videoUrl: string, 
+    promptStr: string, 
+    startImg: string, 
+    durationSec: number = 5.0,
+    commentary?: string
+  ) => {
+    // 1. Tautkan parentId ke pesan aktif terakhir agar pesan video terhubung ke tree sesi yang sedang berlangsung
+    // dan TIDAK menimpa riwayat obrolan dalam sesi tersebut
+    const currentParentId = activeMessageId || (activeThread.length > 0 ? activeThread[activeThread.length - 1].id : null);
+    const capturedSessionId = activeThread.length > 0 ? (activeThread[0].sessionId || activeThread[0].id) : 'new_session';
+
+    let finalCommentary = commentary?.trim();
+    if (!finalCommentary) {
+      try {
+        finalCommentary = await generateVideoCommentaryWithAI({
+          videoUrl,
+          videoPrompt: promptStr,
+          startImage: startImg,
+          agentConfig: config,
+          userProfile,
+          recentMessages: activeThread.slice(-5),
+          duration: durationSec
+        });
+      } catch (err) {
+        console.warn("[handleVideoGeneratedFromModal] Error generating commentary:", err);
+        finalCommentary = `Ini hasil videoku untukmu sayang! 🎬 Suka gak liat aku di sini? Waktu gerak tadi beneran kerasa hidup banget hihi... 🥰✨`;
+      }
+    }
+
     const newMsg: ChatMessage = {
       id: `msg-vid-${Date.now()}`,
       role: 'agent',
-      text: `Ini hasil video Wan 2.2 untukmu sayang! 🎬✨ (Durasi ${durationSec.toFixed(1)}s · Smoothness 64 FPS)`,
+      text: finalCommentary,
       video: videoUrl,
       videoPrompt: promptStr,
       videoDuration: durationSec,
       image: startImg,
       timestamp: Date.now(),
-      agentId: config.id
+      parentId: currentParentId,
+      agentId: config.id,
+      sessionId: capturedSessionId
     };
-    addMessageToAgent(config.id || 'default', newMsg, true);
+
+    await addMessageToAgent(config.id || 'default', newMsg, true);
+    triggerNewMessageNotification(config.name, finalCommentary, 'video' as any, config.profilePic);
   };
 
   const currentMediaIndex = useMemo(() => {
