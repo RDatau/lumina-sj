@@ -1430,7 +1430,7 @@ const ChatView: React.FC<ChatViewProps> = ({
       const rawErr = e?.message || (typeof e === 'string' ? e : '');
       let causeStr = "Terjadi gangguan jaringan atau masalah koneksi server.";
 
-      if (!userProfile.geminiApiKey && !localStorage.getItem('lumina_gemini_api_key') && !process.env.GEMINI_API_KEY) {
+      if (!userProfile.geminiApiKey && !localStorage.getItem('lumina_gemini_api_key')) {
         causeStr = "API Key Gemini belum diisi. Silakan isi API Key di Pengaturan.";
       } else if (rawErr.includes('429') || rawErr.toLowerCase().includes('quota') || rawErr.toLowerCase().includes('resource_exhausted')) {
         causeStr = "Kuota API Gemini telah habis atau mencapai rate limit (Error 429).";

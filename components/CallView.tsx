@@ -407,7 +407,7 @@ const CallView: React.FC<CallViewProps> = ({
           sessionRef.current = null;
         }
 
-        const rawApiKey = userProfile.geminiApiKey || localStorage.getItem('lumina_gemini_api_key') || process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+        const rawApiKey = userProfile.geminiApiKey || localStorage.getItem('lumina_gemini_api_key') || '';
         allKeys = parseGeminiApiKeys(rawApiKey);
         const keyObj = getNextAvailableGeminiKey(allKeys);
         apiKey = keyObj?.key || allKeys[0] || rawApiKey.trim();

@@ -254,10 +254,8 @@ export const getAllGeminiApiKeys = (userProfile?: UserProfile): string[] => {
   const globalSettingKey = getEffectiveGlobalGeminiSettings().geminiApiKey;
   const localCached = typeof localStorage !== 'undefined' ? (localStorage.getItem('lumina_gemini_api_key') || '') : '';
   const userKey = userProfile?.geminiApiKey || '';
-  const envKey1 = process.env.GEMINI_API_KEY || '';
-  const envKey2 = process.env.API_KEY || '';
 
-  const combined = [userKey, globalSettingKey, localCached, envKey1, envKey2].join('\n');
+  const combined = [userKey, globalSettingKey, localCached].join('\n');
   const parsed = parseGeminiApiKeys(combined);
   const uniqueKeys: string[] = [];
   for (const k of parsed) {
@@ -357,16 +355,18 @@ export const createGeminiClient = (apiKeyOrUserProfile?: string | UserProfile): 
     key = getApiKey();
   }
 
+  if (!key) {
+    throw new Error("API Key Gemini belum diatur. Masukkan API Key Gemini Anda di menu Pengaturan untuk mulai menggunakan aplikasi.");
+  }
+
   const clientConfig: any = {
+    apiKey: key,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
       }
     }
   };
-  if (key) {
-    clientConfig.apiKey = key;
-  }
   return new GoogleGenAI(clientConfig);
 };
 
