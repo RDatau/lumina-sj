@@ -66,8 +66,13 @@ export const markTokenExhausted = (token: string) => {
 export const parseHFTokens = (tokensInput?: string): string[] => {
   if (!tokensInput) return [];
   return tokensInput
-    .split(/[\r\n,;]+/)
-    .map(t => t.trim())
+    .split(/[\r\n,;\s]+/)
+    .map(t => t.trim()
+      .replace(/^(?:HF_TOKEN|TOKEN)\s*[:=]\s*/i, '')
+      .replace(/^Bearer\s+/i, '')
+      .replace(/^["']|["']$/g, '')
+      .trim()
+    )
     .filter(t => t.length > 0);
 };
 

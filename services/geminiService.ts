@@ -241,8 +241,12 @@ const getFallbackTitle = (text: string): string => {
 export const parseGeminiApiKeys = (input?: string): string[] => {
   if (!input) return [];
   return input
-    .split(/[\r\n,;]+/)
-    .map(k => k.trim())
+    .split(/[\r\n,;\s]+/)
+    .map(k => k.trim()
+      .replace(/^(?:GEMINI_API_KEY|API_KEY|KEY)\s*[:=]\s*/i, '')
+      .replace(/^["']|["']$/g, '')
+      .trim()
+    )
     .filter(k => k.length > 10);
 };
 
