@@ -607,17 +607,28 @@ const ChatView: React.FC<ChatViewProps> = ({
     isOpen: boolean;
     startImage: string | null;
     prompt: string;
+    sourceMessageId: string | null;
   }>({
     isOpen: false,
     startImage: null,
-    prompt: ''
+    prompt: '',
+    sourceMessageId: null
   });
 
-  const handleOpenVideoModal = (startImg?: string | null, initialPrompt?: string) => {
+  const handleOpenVideoModal = (startImg?: string | null, initialPrompt?: string, sourceMsgId?: string | null) => {
+    let foundMsgId = sourceMsgId || null;
+    if (!foundMsgId && startImg) {
+      const matchMsg = activeThread.find(m => m.image === startImg);
+      if (matchMsg) foundMsgId = matchMsg.id;
+    }
+    if (!foundMsgId && activeMessageId) {
+      foundMsgId = activeMessageId;
+    }
     setVideoModalData({
       isOpen: true,
       startImage: startImg || null,
-      prompt: initialPrompt || ''
+      prompt: initialPrompt || '',
+      sourceMessageId: foundMsgId
     });
   };
 
@@ -1021,9 +1032,11 @@ const ChatView: React.FC<ChatViewProps> = ({
     durationSec: number = 5.0,
     commentary?: string
   ) => {
-    // 1. Tautkan parentId ke pesan aktif terakhir agar pesan video terhubung ke tree sesi yang sedang berlangsung
-    // dan TIDAK menimpa riwayat obrolan dalam sesi tersebut
-    const currentParentId = activeMessageId || (activeThread.length > 0 ? activeThread[activeThread.length - 1].id : null);
+    // Tautkan parentId ke parent dari pesan sumber (sourceMessage.parentId) agar menjadi cabang sejajar (sibling) dengan PAP di bawah pesan User
+    const sourceMsg = videoModalData.sourceMessageId 
+      ? activeThread.find(m => m.id === videoModalData.sourceMessageId) 
+      : null;
+    const currentParentId = sourceMsg?.parentId || videoModalData.sourceMessageId || activeMessageId || (activeThread.length > 0 ? activeThread[activeThread.length - 1].id : null);
     const capturedSessionId = activeThread.length > 0 ? (activeThread[0].sessionId || activeThread[0].id) : 'new_session';
 
     let finalCommentary = commentary?.trim();
@@ -1051,7 +1064,7 @@ const ChatView: React.FC<ChatViewProps> = ({
       video: videoUrl,
       videoPrompt: promptStr,
       videoDuration: durationSec,
-      image: startImg,
+      // Omit image: startImg so start frame image is NOT shown in the video chat balloon
       timestamp: Date.now(),
       parentId: currentParentId,
       agentId: config.id,
@@ -2742,7 +2755,7 @@ const ChatView: React.FC<ChatViewProps> = ({
 
                       <button onClick={(e) => { 
                         e.stopPropagation(); 
-                        handleOpenVideoModal(m.image!, m.imagePrompt || m.outfit || m.text);
+                        handleOpenVideoModal(m.image!, m.imagePrompt || m.outfit || m.text, m.id);
                       }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Buat Video (Wan 2.2 I2V)"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
                     </div>
 
@@ -3198,7 +3211,8 @@ const ChatView: React.FC<ChatViewProps> = ({
                 const lastImageMsg = [...activeThread].reverse().find(msg => msg.image);
                 handleOpenVideoModal(
                   lastImageMsg?.image || attachedFiles.find(f => f.mimeType.startsWith('image/'))?.data || null, 
-                  lastImageMsg?.imagePrompt || ''
+                  lastImageMsg?.imagePrompt || '',
+                  lastImageMsg?.id || null
                 );
               }}
               className={`p-3 mb-0.5 hover:bg-white/10 rounded-full transition-all active:scale-90 flex items-center justify-center shrink-0 ${dynamicIconColor}`}
@@ -4148,7 +4162,10 @@ const ChatView: React.FC<ChatViewProps> = ({
         agentName={imageInfoData.agentName || config.name}
         isBackgroundDark={isBackgroundDark}
         themeHex={themeHex}
-        onGenerateVideo={(imgUrl, pr) => handleOpenVideoModal(imgUrl, pr)}
+        onGenerateVideo={(imgUrl, pr) => {
+          const matchMsg = activeThread.find(m => m.image === imgUrl);
+          handleOpenVideoModal(imgUrl, pr, matchMsg?.id || activeMessageId);
+        }}
       />
 
       {/* Wan 2.2 Video Studio Modal */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AgentConfig, UserProfile } from '../types';
-import { generateWanVideo } from '../services/huggingFaceService';
+import { generateWanVideo, proxyFetch } from '../services/huggingFaceService';
 import { generateVideoPromptWithAI, generateVideoCommentaryWithAI } from '../services/geminiService';
 import { DEFAULT_WAN_VIDEO_SPACE_URL } from '../services/dbService';
 
@@ -168,9 +168,30 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
 
       setGeneratedVideoUrl(videoResult);
 
+      // Konversi video ke base64 di memori lokal agar AI analisis bisa benar-benar melihat isi video secara utuh (inlineData)
+      let analysisVideoUrl = videoResult;
+      if (!analysisVideoUrl.startsWith('data:')) {
+        try {
+          setGenerationStatus("Mengonversi video ke memori lokal (base64) untuk analisis AI...");
+          const resp = await proxyFetch(analysisVideoUrl);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            analysisVideoUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            setGeneratedVideoUrl(analysisVideoUrl);
+          }
+        } catch (e) {
+          console.warn("[WanVideoModal] Pre-convert video to base64 failed, using URL:", e);
+        }
+      }
+
       // Mulai analisa video otomatis di latar belakang agar komentar siap saat user klik 'Simpan ke Chat'
       generateVideoCommentaryWithAI({
-        videoUrl: videoResult,
+        videoUrl: analysisVideoUrl,
         videoPrompt: finalPrompt,
         startImage,
         agentConfig,
@@ -205,11 +226,31 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
     if (!generatedVideoUrl || !startImage || isSavingToChat) return;
     setIsSavingToChat(true);
     try {
+      let finalVideoUrl = generatedVideoUrl;
+      // Pastikan video sudah dalam base64 lokal saat disimpan ke chat
+      if (!finalVideoUrl.startsWith('data:')) {
+        try {
+          setGenerationStatus("Menyimpan video ke memori lokal dalam base64...");
+          const resp = await proxyFetch(finalVideoUrl);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            finalVideoUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          }
+        } catch (convErr) {
+          console.warn("[WanVideoModal] Failed to convert video to base64 on save, using URL:", convErr);
+        }
+      }
+
       let commentary = analyzedCommentary;
       if (!commentary) {
         setGenerationStatus("Menganalisa video untuk pesan chat...");
         commentary = await generateVideoCommentaryWithAI({
-          videoUrl: generatedVideoUrl,
+          videoUrl: finalVideoUrl,
           videoPrompt: prompt.trim() || userIdea.trim(),
           startImage,
           agentConfig,
@@ -219,7 +260,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
         setAnalyzedCommentary(commentary);
       }
       if (onVideoGenerated) {
-        await onVideoGenerated(generatedVideoUrl, prompt, startImage, duration, commentary);
+        await onVideoGenerated(finalVideoUrl, prompt, startImage, duration, commentary);
       }
       onClose();
     } catch (err) {
