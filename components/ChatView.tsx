@@ -2843,9 +2843,22 @@ const ChatView: React.FC<ChatViewProps> = ({
                 {/* Video Bubble Display */}
                 {m.video && (
                   <div 
-                    className={`mb-4 overflow-hidden rounded-2xl border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'} relative group/video bg-black/70 shadow-2xl cursor-pointer`}
+                    className={`mb-4 overflow-hidden rounded-2xl border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'} relative group/video bg-black shadow-2xl cursor-pointer`}
                     onClick={() => setPreviewMedia({ name: 'Video Wan 2.2', mimeType: 'video/mp4', data: m.video!, id: m.id })}
                   >
+                    {/* Ambient / Glow Background Effect */}
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
+                      <video 
+                        src={m.video} 
+                        muted 
+                        loop 
+                        playsInline 
+                        autoPlay
+                        className="absolute inset-0 w-full h-full object-cover filter blur-3xl opacity-75 scale-150 transform pointer-events-none" 
+                      />
+                      <div className="absolute inset-0 bg-black/40 backdrop-blur-md" />
+                    </div>
+
                     <video 
                       ref={(el) => {
                         if (!el) return;
@@ -2870,15 +2883,15 @@ const ChatView: React.FC<ChatViewProps> = ({
                       muted
                       loop
                       playsInline
-                      className="w-full max-h-96 object-contain rounded-2xl bg-black pointer-events-none" 
+                      className="relative z-10 w-full max-h-96 object-contain rounded-2xl pointer-events-none" 
                     />
 
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover/video:opacity-100 transition-all pointer-events-none">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover/video:opacity-100 transition-all pointer-events-none z-20">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                     </div>
 
-                    {/* Action buttons (Download & Info) floating overlay */}
-                    <div className="absolute top-3 right-3 flex flex-col gap-1.5 opacity-90 md:opacity-0 md:group-hover/video:opacity-100 transition-all z-10">
+                    {/* Action buttons (Download, Regenerate Caption & Info) floating overlay */}
+                    <div className="absolute top-3 right-3 flex flex-col gap-1.5 opacity-90 md:opacity-0 md:group-hover/video:opacity-100 transition-all z-30">
                       <button onClick={(e) => { 
                         e.stopPropagation(); 
                         const d = new Date(m.timestamp);
@@ -2886,6 +2899,28 @@ const ChatView: React.FC<ChatViewProps> = ({
                         const vidIndex = activeThread.filter((msg, i) => i <= activeThread.indexOf(m) && msg.video).length;
                         downloadMedia(m.video!, `wan22_${getSafeAgentName()}_${dateStr}_${vidIndex}.mp4`, 'video/mp4'); 
                       }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Unduh Video MP4"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg></button>
+
+                      <button onClick={async (e) => {
+                        e.stopPropagation();
+                        const btn = e.currentTarget;
+                        btn.classList.add('animate-spin');
+                        try {
+                          const newCommentary = await generateVideoCommentaryWithAI({
+                            videoUrl: m.video!,
+                            videoPrompt: m.videoPrompt || m.text,
+                            startImage: null,
+                            agentConfig: config,
+                            userProfile: userProfile,
+                            recentMessages: activeThread,
+                            duration: m.videoDuration || 5.0
+                          });
+                          setMessages(prev => prev.map(msg => msg.id === m.id ? { ...msg, text: newCommentary } : msg));
+                        } catch (err) {
+                          console.error("Failed to regenerate video caption:", err);
+                        } finally {
+                          btn.classList.remove('animate-spin');
+                        }
+                      }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Regenerate Caption / Komentar Video"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg></button>
 
                       <button onClick={(e) => { 
                         e.stopPropagation(); 
@@ -2899,15 +2934,6 @@ const ChatView: React.FC<ChatViewProps> = ({
                           agentName: config.name
                         });
                       }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Informasi Video"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></button>
-                    </div>
-
-                    <div className="p-3 bg-black/60 backdrop-blur-md flex items-center justify-between text-xs text-white/90 border-t border-white/10">
-                      <div className="flex items-center gap-2 font-mono text-[10px]">
-                        <span className="px-2 py-0.5 rounded-full bg-violet-600/40 text-violet-300 border border-violet-500/50 font-bold uppercase tracking-wider">
-                          🎬 Wan 2.2 Video
-                        </span>
-                        <span className="text-white/60 font-medium">64 FPS · {m.videoDuration ? `${m.videoDuration.toFixed(1)}s` : '5.0s'}</span>
-                      </div>
                     </div>
                   </div>
                 )}
