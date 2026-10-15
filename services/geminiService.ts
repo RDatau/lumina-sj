@@ -2307,7 +2307,7 @@ ATURAN MUTLAK PENULISAN PESAN/KOMENTAR VIDEO:
       config: {
         temperature: 1.0,
         topP: 0.98,
-        maxOutputTokens: 1500,
+        maxOutputTokens: 5000,
         thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
         safetySettings: safetySettings as any,
       }
@@ -2321,7 +2321,7 @@ ATURAN MUTLAK PENULISAN PESAN/KOMENTAR VIDEO:
 
     // Enforce hard character/sentence limit as a safety fallback
     const sentences = result?.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const cappedResult = sentences?.slice(0, 4).join('. ') + (sentences && sentences.length > 4 ? '.' : '');
+    const cappedResult = sentences?.slice(0, 10).join('. ') + (sentences && sentences.length > 10 ? '.' : '');
 
     if (cappedResult && cappedResult.length > 5) {
       return cappedResult;
