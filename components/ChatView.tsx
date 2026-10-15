@@ -1073,7 +1073,7 @@ const ChatView: React.FC<ChatViewProps> = ({
         });
       } catch (err) {
         console.warn("[handleVideoGeneratedFromModal] Error generating commentary:", err);
-        finalCommentary = `Ini hasil videoku untukmu sayang! 🎬 Suka gak liat aku di sini? Waktu gerak tadi beneran kerasa hidup banget hihi... 🥰✨`;
+        finalCommentary = `Nih, liat videonya... Gimana? Suka gak? Bagus, kan?`;
       }
     }
 
