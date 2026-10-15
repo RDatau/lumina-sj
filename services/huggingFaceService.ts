@@ -1141,7 +1141,9 @@ export const buildWanVideoPayload = (
   formattedEndImage: any | null,
   prompt: string,
   durationSeconds: number = 5.0,
-  frameMultiplier: number = 64
+  frameMultiplier: number = 64,
+  identityImage: any | null = null,
+  identityStrength: number = 0.45
 ): any[] => {
   const defaultNegativePrompt = "色调艳丽, 过曝, 静态, 细节模糊不清, 字幕, 风格, 作品, 画作, 画面, 静止, 整体发灰, 最差质量, 低质量, JPEG压缩残留, 丑陋的, 残缺的, 多余的手指, 画得不好的手部, 画得不好的脸部, 畸形的, 毁容的, 形态畸形的肢体, 手指融合, 静止不动的画面, 杂乱的背景, 三条腿, 背景人很多, 倒着走";
 
@@ -1173,8 +1175,8 @@ export const buildWanVideoPayload = (
     "", "(None)", 1.0, "(None)", 1.0,             // 38-42: my3
     "", "(None)", 1.0, "(None)", 1.0,             // 43-47: my4
     "", "(None)", 1.0, "(None)", 1.0,             // 48-52: my5
-    null,                                         // 53: identity_ref_component
-    0.45,                                         // 54: identity_strength_slider
+    identityImage,                                // 53: identity_ref_component
+    identityStrength,                             // 54: identity_strength_slider
     true                                          // 55: play_result_video
   ];
 };
@@ -1324,6 +1326,8 @@ export interface GenerateWanVideoParams {
   fps?: number; // 64
   spaceUrl?: string;
   tokens?: string;
+  identityImage?: string | null;
+  identityStrength?: number;
   onStatusUpdate?: (status: string) => void;
 }
 
@@ -1341,6 +1345,8 @@ export const generateWanVideo = async (
     fps = 64,
     spaceUrl,
     tokens: rawTokens,
+    identityImage,
+    identityStrength,
     onStatusUpdate
   } = params;
 
@@ -1389,7 +1395,7 @@ export const generateWanVideo = async (
 
       // 3. Bangun payload 56 slot (Smoothness 64 FPS, Durasi 5.0 detik)
       onStatusUpdate?.(`Menyiapkan parameter Wan 2.2 (Durasi ${duration}s, ${fps} FPS)...`);
-      const payloadData = buildWanVideoPayload(formattedStart, formattedEnd, prompt, duration, fps);
+      const payloadData = buildWanVideoPayload(formattedStart, formattedEnd, prompt, duration, fps, identityImage || null, identityStrength || 0.45);
 
       // 4. Kirim tugas video ke Space via Gradio Modern SSE
       onStatusUpdate?.("Mengirim tugas video ke Space ZeroGPU (Wan 2.2)...");

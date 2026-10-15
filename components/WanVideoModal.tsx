@@ -181,6 +181,8 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
         fps: 64,            // Smoothness 64 FPS
         spaceUrl: userProfile?.hfVideoSpaceUrl || DEFAULT_WAN_VIDEO_SPACE_URL,
         tokens: userProfile?.hfTokens || '',
+        identityImage,
+        identityStrength,
         onStatusUpdate: (status) => setGenerationStatus(status)
       });
 
