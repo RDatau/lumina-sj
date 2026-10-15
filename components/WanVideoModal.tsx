@@ -52,6 +52,9 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [identityImage, setIdentityImage] = useState<string | null>(null);
   const [identityStrength, setIdentityStrength] = useState<number>(0.45);
+  const [isDraggingStart, setIsDraggingStart] = useState<boolean>(false);
+  const [isDraggingEnd, setIsDraggingEnd] = useState<boolean>(false);
+  const [isDraggingIdentity, setIsDraggingIdentity] = useState<boolean>(false);
 
   const startFileInputRef = useRef<HTMLInputElement>(null);
   const endFileInputRef = useRef<HTMLInputElement>(null);
@@ -147,6 +150,20 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
       console.warn("[WanVideoModal] Gagal enhance prompt:", err);
     } finally {
       setIsEnhancingPrompt(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, setter: (val: string | null) => void) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        if (result) setter(result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -311,7 +328,11 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-2xl animate-in fade-in duration-300">
+    <div 
+      className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-2xl animate-in fade-in duration-300"
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); }}
+    >
       <div 
         className={`relative w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-[32px] border border-white/15 shadow-[0_25px_70px_rgba(0,0,0,0.8)] flex flex-col ${
           isBackgroundDark ? 'bg-zinc-950/95 text-white' : 'bg-neutral-900/95 text-white'
@@ -392,34 +413,59 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
           {/* Section 1: Frame Slots (Start Frame & Optional End Frame) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Slot 1: Start Frame */}
-            <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 relative">
+            <div 
+              className={`flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border-2 transition-all duration-300 relative ${isDraggingStart ? 'border-indigo-500 scale-[1.02] shadow-2xl bg-indigo-500/10' : 'border-white/10'}`}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingStart(true); setIsDraggingEnd(false); setIsDraggingIdentity(false); }}
+              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingStart(false); }}
+              onDrop={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                setIsDraggingStart(false); 
+                const file = e.dataTransfer.files?.[0];
+                if (file && file.type.startsWith('image/')) {
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    const result = event.target?.result as string;
+                    if (result) setStartImage(result);
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+            >
+              {isDraggingStart && (
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-indigo-500/25 backdrop-blur-sm rounded-2xl animate-in fade-in duration-200 pointer-events-none">
+                  <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center shadow-xl mb-2 animate-bounce">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </div>
+                  <span className="text-white text-[9px] font-black uppercase tracking-[0.2em] drop-shadow-md">Lepas untuk Start Frame</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-white/90 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                   Start Frame (Wajib)
                 </span>
-                <button
-                  type="button"
-                  onClick={() => startFileInputRef.current?.click()}
-                  disabled={isGenerating}
-                  className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
-                >
-                  {startImage ? 'Ganti Gambar' : 'Unggah Gambar'}
-                </button>
+                <div className="flex gap-2">
+                  {startImage && (
+                    <button type="button" onClick={() => setStartImage(null)} disabled={isGenerating} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-all cursor-pointer">Hapus</button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => startFileInputRef.current?.click()}
+                    disabled={isGenerating}
+                    className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+                  >
+                    {startImage ? 'Ganti' : 'Unggah'}
+                  </button>
+                </div>
               </div>
 
               {startImage ? (
                 <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-black/40 border border-white/10 group">
                   <img src={startImage} alt="Start Frame" className="w-full h-full object-contain" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => startFileInputRef.current?.click()}
-                      className="px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-md text-white text-xs font-bold hover:scale-105 active:scale-95 transition-all"
-                    >
-                      Ganti Foto
-                    </button>
-                  </div>
                 </div>
               ) : (
                 <div 
@@ -429,7 +475,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" />
                   </svg>
-                  <span className="text-xs font-bold text-white/60">Klik untuk Unggah Start Frame</span>
+                  <span className="text-xs font-bold text-white/60">Klik atau Drag & Drop Start Frame</span>
                   <span className="text-[10px] text-white/30">PNG / JPG / WEBP</span>
                 </div>
               )}
@@ -460,52 +506,59 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
             </div>
 
             {/* Slot 2: End Frame (Optional) */}
-            <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 relative">
+            <div 
+              className={`flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border-2 transition-all duration-300 relative ${isDraggingEnd ? 'border-indigo-500 scale-[1.02] shadow-2xl bg-indigo-500/10' : 'border-white/10'}`}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingEnd(true); setIsDraggingStart(false); setIsDraggingIdentity(false); }}
+              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingEnd(false); }}
+              onDrop={(e) => { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                setIsDraggingEnd(false); 
+                const file = e.dataTransfer.files?.[0];
+                if (file && file.type.startsWith('image/')) {
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    const result = event.target?.result as string;
+                    if (result) setEndImage(result);
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+            >
+              {isDraggingEnd && (
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-indigo-500/25 backdrop-blur-sm rounded-2xl animate-in fade-in duration-200 pointer-events-none">
+                  <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center shadow-xl mb-2 animate-bounce">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </div>
+                  <span className="text-white text-[9px] font-black uppercase tracking-[0.2em] drop-shadow-md">Lepas untuk End Frame</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-white/70 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-violet-400"></span>
                   End Frame (Opsional)
                 </span>
-                {endImage ? (
-                  <button
-                    type="button"
-                    onClick={() => setEndImage(null)}
-                    disabled={isGenerating}
-                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-all cursor-pointer"
-                  >
-                    Hapus
-                  </button>
-                ) : (
+                <div className="flex gap-2">
+                  {endImage && (
+                    <button type="button" onClick={() => setEndImage(null)} disabled={isGenerating} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-all cursor-pointer">Hapus</button>
+                  )}
                   <button
                     type="button"
                     onClick={() => endFileInputRef.current?.click()}
                     disabled={isGenerating}
                     className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
                   >
-                    Unggah
+                    {endImage ? 'Ganti' : 'Unggah'}
                   </button>
-                )}
+                </div>
               </div>
 
               {endImage ? (
                 <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-black/40 border border-white/10 group">
                   <img src={endImage} alt="End Frame" className="w-full h-full object-contain" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => endFileInputRef.current?.click()}
-                      className="px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-md text-white text-xs font-bold hover:scale-105 active:scale-95 transition-all"
-                    >
-                      Ganti Foto
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEndImage(null)}
-                      className="px-3 py-1.5 rounded-xl bg-red-600/80 backdrop-blur-md text-white text-xs font-bold hover:scale-105 active:scale-95 transition-all"
-                    >
-                      Hapus
-                    </button>
-                  </div>
                 </div>
               ) : (
                 <div 
@@ -515,7 +568,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  <span className="text-xs font-semibold text-white/50">Tambah End Frame (Bisa Dikosongkan)</span>
+                  <span className="text-xs font-semibold text-white/50">Tambah End Frame atau Drag & Drop</span>
                   <span className="text-[10px] text-white/30 text-center px-4">
                     Mengarahkan transisi gerakan menuju pose/posisi akhir
                   </span>
@@ -549,20 +602,54 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
           </div>
 
           {/* New Section: Identity Lock */}
-          <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 relative">
+          <div 
+            className={`flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border-2 transition-all duration-300 relative ${isDraggingIdentity ? 'border-indigo-500 scale-[1.02] shadow-2xl bg-indigo-500/10' : 'border-white/10'}`}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingIdentity(true); setIsDraggingStart(false); setIsDraggingEnd(false); }}
+            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingIdentity(false); }}
+            onDrop={(e) => { 
+              e.preventDefault(); 
+              e.stopPropagation(); 
+              setIsDraggingIdentity(false); 
+              const file = e.dataTransfer.files?.[0];
+              if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  const result = event.target?.result as string;
+                  if (result) setIdentityImage(result);
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
+          >
+            {isDraggingIdentity && (
+              <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-indigo-500/25 backdrop-blur-sm rounded-2xl animate-in fade-in duration-200 pointer-events-none">
+                <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center shadow-xl mb-2 animate-bounce">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </div>
+                <span className="text-white text-[9px] font-black uppercase tracking-[0.2em] drop-shadow-md">Lepas untuk Identity Lock</span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <span className="text-xs font-black uppercase tracking-wider text-white/90 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                Identity Lock (Opsional)
+                Identity Lock (Opsional) - Drag & Drop atau Unggah
               </span>
-              <button
-                type="button"
-                onClick={() => identityFileInputRef.current?.click()}
-                disabled={isGenerating}
-                className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
-              >
-                {identityImage ? 'Ganti Foto' : 'Unggah Foto'}
-              </button>
+              <div className="flex gap-2">
+                {identityImage && (
+                  <button type="button" onClick={() => setIdentityImage(null)} disabled={isGenerating} className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-all cursor-pointer">Hapus</button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => identityFileInputRef.current?.click()}
+                  disabled={isGenerating}
+                  className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+                >
+                  {identityImage ? 'Ganti' : 'Unggah'}
+                </button>
+              </div>
             </div>
             
             <input 

@@ -157,33 +157,29 @@ const App: React.FC = () => {
   // Global Context Menu for App
   useEffect(() => {
     const handleGlobalContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      
-      let items: ContextMenuItem[] = [];
-      
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        // Menu khusus input tetap dipertahankan karena berguna
-        items = [
-          { label: 'Potong (Cut)', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758L5 19m0-14l4.121 4.121" /></svg>, onClick: () => { document.execCommand('cut'); } },
-          { label: 'Salin (Copy)', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>, onClick: () => { document.execCommand('copy'); } },
-          { label: 'Tempel (Paste)', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, onClick: async () => { 
-            try {
-              const text = await navigator.clipboard.readText();
-              const el = e.target as HTMLInputElement | HTMLTextAreaElement;
-              const start = el.selectionStart || 0;
-              const end = el.selectionEnd || 0;
-              el.setRangeText(text, start, end, 'end');
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-            } catch (err) {
-              console.error('Paste failed:', err);
-            }
-          } },
-          { label: 'Pilih Semua', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-2.5m0 2.5h5m-5 0h-5m10 0V14m0-2.5v-2.5m0 2.5h5m-5 0h-5" /></svg>, onClick: () => { (e.target as HTMLInputElement | HTMLTextAreaElement).select(); } },
-        ];
-      } else {
-        // HAPUS MENU UMUM GLOBAL AGAR TIDAK REBUTAN AREA
+      if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         return;
       }
+      
+      e.preventDefault();
+      
+      let items: ContextMenuItem[] = [
+        { label: 'Potong (Cut)', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758L5 19m0-14l4.121 4.121" /></svg>, onClick: () => { document.execCommand('cut'); } },
+        { label: 'Salin (Copy)', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>, onClick: () => { document.execCommand('copy'); } },
+        { label: 'Tempel (Paste)', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, onClick: async () => { 
+          try {
+            const text = await navigator.clipboard.readText();
+            const el = e.target as HTMLInputElement | HTMLTextAreaElement;
+            const start = el.selectionStart || 0;
+            const end = el.selectionEnd || 0;
+            el.setRangeText(text, start, end, 'end');
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          } catch (err) {
+            console.error('Paste failed:', err);
+          }
+        } },
+        { label: 'Pilih Semua', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11.5V14m0-2.5v-2.5m0 2.5h5m-5 0h-5m10 0V14m0-2.5v-2.5m0 2.5h5m-5 0h-5" /></svg>, onClick: () => { (e.target as HTMLInputElement | HTMLTextAreaElement).select(); } },
+      ];
       
       setContextMenu({ x: e.clientX, y: e.clientY, items, target: e.target as HTMLElement });
     };
