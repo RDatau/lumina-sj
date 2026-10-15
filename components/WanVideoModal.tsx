@@ -3,6 +3,7 @@ import { AgentConfig, UserProfile, ActiveGenerationTask } from '../types';
 import { generateWanVideo, generateLtxVideo, proxyFetch } from '../services/huggingFaceService';
 import { generateVideoPromptWithAI, generateVideoCommentaryWithAI } from '../services/geminiService';
 import { DEFAULT_WAN_VIDEO_SPACE_URL } from '../services/dbService';
+import { triggerNewMessageNotification } from '../services/notificationService';
 
 interface ChatHistoryImage {
   url: string;
@@ -37,6 +38,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
   chatHistoryImages = [],
   onVideoGenerated,
   onStartGeneration,
+  onUpdateGeneration,
   onFinishGeneration
 }) => {
   const [startImage, setStartImage] = useState<string | null>(initialStartImage);
@@ -187,12 +189,27 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
     setIsGenerating(true);
     setErrorMessage(null);
     const model = userProfile?.videoGeneratorModel || 'wan2.2';
+    
+    // Notify start
+    triggerNewMessageNotification(agentConfig.name, "Memulai pembuatan video...", 'video', agentConfig.profilePic);
+    onStartGeneration?.({
+      id: `vid-gen-${Date.now()}`,
+      agentId: agentConfig.id || 'default',
+      agentName: agentConfig.name,
+      agentPic: agentConfig.profilePic,
+      type: 'text',
+      statusText: 'Memulai pembuatan video...',
+      startedAt: Date.now()
+    });
+    
     setGenerationStatus(`Menghubungkan ke ${model === 'ltx2.3' ? 'LTX 2.3' : 'Wan 2.2'} Studio...`);
+    onUpdateGeneration?.(agentConfig.id || 'default', 'Menghubungkan ke Studio...', 'text');
 
     try {
       let finalPrompt = prompt.trim();
       if (!finalPrompt && userIdea.trim()) {
         setGenerationStatus("Gemini 3.1 Flash Lite sedang memformulasikan prompt sinematik...");
+        onUpdateGeneration?.(agentConfig.id || 'default', 'Memformulasikan prompt...', 'text');
         const characterContext = `${agentConfig.name}, ${agentConfig.currentOutfit || ''}, ${agentConfig.personality || ''}`;
         finalPrompt = await generateVideoPromptWithAI(userIdea.trim(), characterContext, userProfile, model, duration);
         setPrompt(finalPrompt);
@@ -216,7 +233,10 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
           audioRefGuidanceScale,
           audioRefStemSep,
           audioRefNormalize,
-          onStatusUpdate: (status) => setGenerationStatus(status)
+          onStatusUpdate: (status) => {
+            setGenerationStatus(status);
+            onUpdateGeneration?.(agentConfig.id || 'default', status, 'text');
+          }
         });
       } else {
         videoResult = await generateWanVideo({
@@ -229,7 +249,10 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
           tokens: userProfile?.hfTokens || '',
           identityImage,
           identityStrength,
-          onStatusUpdate: (status) => setGenerationStatus(status)
+          onStatusUpdate: (status) => {
+            setGenerationStatus(status);
+            onUpdateGeneration?.(agentConfig.id || 'default', status, 'text');
+          }
         });
       }
 
@@ -240,6 +263,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
       if (!analysisVideoUrl.startsWith('data:')) {
         try {
           setGenerationStatus("Mengonversi video ke memori lokal (base64) untuk analisis AI...");
+          onUpdateGeneration?.(agentConfig.id || 'default', 'Mengonversi video...', 'text');
           const resp = await proxyFetch(analysisVideoUrl);
           if (resp.ok) {
             const blob = await resp.blob();
@@ -257,6 +281,9 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
       }
 
       // Mulai analisa video... (sama seperti sebelumnya)
+      triggerNewMessageNotification(agentConfig.name, "Video telah selesai dibuat!", 'video', agentConfig.profilePic);
+      onFinishGeneration?.(agentConfig.id || 'default', 'text');
+      
       generateVideoCommentaryWithAI({
         videoUrl: analysisVideoUrl,
         videoPrompt: finalPrompt,
