@@ -97,6 +97,7 @@ export interface GlobalGeminiSettings {
   useGoogleSearch: boolean;
   hfSpaceUrl?: string;
   hfVideoSpaceUrl?: string;
+  videoGeneratorModel?: 'wan2.2' | 'ltx2.3';
   hfTokens?: string;
   hfApiEndpoint?: string;
   injectNegativePrompt?: boolean;
@@ -123,6 +124,7 @@ export interface UserProfile {
   isEnrichPersonaEnabled?: boolean;
   hfSpaceUrl?: string;
   hfVideoSpaceUrl?: string;
+  videoGeneratorModel?: 'wan2.2' | 'ltx2.3';
   hfTokens?: string;
   hfApiEndpoint?: string;
   injectNegativePrompt?: boolean;

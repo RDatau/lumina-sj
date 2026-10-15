@@ -918,6 +918,7 @@ const ChatView: React.FC<ChatViewProps> = ({
   const [previewVideoPlaying, setPreviewVideoPlaying] = useState(false);
   const [previewVideoProgress, setPreviewVideoProgress] = useState(0);
   const [previewVideoDuration, setPreviewVideoDuration] = useState(0);
+  const [previewVideoLoop, setPreviewVideoLoop] = useState<boolean>(true);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const isMounted = useRef(true);
 
@@ -2943,9 +2944,10 @@ const ChatView: React.FC<ChatViewProps> = ({
                       <button onClick={(e) => { 
                         e.stopPropagation(); 
                         const d = new Date(m.timestamp);
-                        const dateStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}_${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
+                        const dateStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                        const timeStr = `${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
                         const vidIndex = activeThread.filter((msg, i) => i <= activeThread.indexOf(m) && msg.video).length;
-                        downloadMedia(m.video!, `wan22_${getSafeAgentName()}_${dateStr}_${vidIndex}.mp4`, 'video/mp4'); 
+                        downloadMedia(m.video!, `story_${getSafeAgentName()}_${dateStr}_${timeStr}_${vidIndex}.mp4`, 'video/mp4'); 
                       }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Unduh Video MP4"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg></button>
 
                       <button onClick={async (e) => {
@@ -4096,7 +4098,17 @@ const ChatView: React.FC<ChatViewProps> = ({
                               playsInline
                               onTimeUpdate={handleVideoTimeUpdate}
                               onLoadedMetadata={handleVideoLoadedMetadata}
-                              onEnded={() => setPreviewVideoPlaying(false)}
+                              onEnded={() => {
+                                 if (previewVideoLoop) {
+                                   if (previewVideoRef.current) {
+                                     previewVideoRef.current.currentTime = 0;
+                                     previewVideoRef.current.play().catch(() => {});
+                                     setPreviewVideoPlaying(true);
+                                   }
+                                 } else {
+                                   setPreviewVideoPlaying(false);
+                                 }
+                               }}
                               onClick={(e) => { e.stopPropagation(); togglePreviewVideo(); }}
                             />
                           )}
@@ -4136,7 +4148,21 @@ const ChatView: React.FC<ChatViewProps> = ({
                               />
                             </div>
 
-                            <button
+                                                         <button
+                               type="button"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 setPreviewVideoLoop(!previewVideoLoop);
+                               }}
+                               className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0 cursor-pointer ${previewVideoLoop ? "bg-white/20 text-white shadow-inner ring-1 ring-white/35" : "bg-white/10 hover:bg-white/20 text-white/40"}`}
+                               title={previewVideoLoop ? "Loop: Aktif" : "Loop: Nonaktif"}
+                             >
+                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" />
+                               </svg>
+                             </button>
+
+                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (previewVideoRef.current) {

@@ -46,7 +46,7 @@ export const VideoInfoModal: React.FC<VideoInfoModalProps> = ({
         <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-full bg-violet-600/30 text-violet-300 border border-violet-500/50 text-xs font-black uppercase tracking-wider">
-              🎬 Wan 2.2 Video Info
+              Video Info
             </span>
           </div>
           <button 

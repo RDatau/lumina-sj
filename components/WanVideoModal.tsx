@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AgentConfig, UserProfile, ActiveGenerationTask } from '../types';
-import { generateWanVideo, proxyFetch } from '../services/huggingFaceService';
+import { generateWanVideo, generateLtxVideo, proxyFetch } from '../services/huggingFaceService';
 import { generateVideoPromptWithAI, generateVideoCommentaryWithAI } from '../services/geminiService';
 import { DEFAULT_WAN_VIDEO_SPACE_URL } from '../services/dbService';
 
@@ -35,7 +35,9 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
   themeHex = '#ec4899',
   isBackgroundDark = true,
   chatHistoryImages = [],
-  onVideoGenerated
+  onVideoGenerated,
+  onStartGeneration,
+  onFinishGeneration
 }) => {
   const [startImage, setStartImage] = useState<string | null>(initialStartImage);
   const [endImage, setEndImage] = useState<string | null>(null);
@@ -55,6 +57,14 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
   const [isDraggingStart, setIsDraggingStart] = useState<boolean>(false);
   const [isDraggingEnd, setIsDraggingEnd] = useState<boolean>(false);
   const [isDraggingIdentity, setIsDraggingIdentity] = useState<boolean>(false);
+
+  // LTX 2.3 Audio Settings
+  const [audioRefEnabled, setAudioRefEnabled] = useState(false);
+  const [audioRefGuidanceScale, setAudioRefGuidanceScale] = useState(3.0);
+  const [audioRefStemSep, setAudioRefStemSep] = useState(false);
+  const [audioRefNormalize, setAudioRefNormalize] = useState(true);
+  const [audioRefFile, setAudioRefFile] = useState<string | null>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
 
   const startFileInputRef = useRef<HTMLInputElement>(null);
   const endFileInputRef = useRef<HTMLInputElement>(null);
@@ -176,36 +186,56 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
 
     setIsGenerating(true);
     setErrorMessage(null);
-    setGenerationStatus("Menghubungkan ke Wan 2.2 I2V Studio...");
+    const model = userProfile?.videoGeneratorModel || 'wan2.2';
+    setGenerationStatus(`Menghubungkan ke ${model === 'ltx2.3' ? 'LTX 2.3' : 'Wan 2.2'} Studio...`);
 
     try {
       let finalPrompt = prompt.trim();
       if (!finalPrompt && userIdea.trim()) {
         setGenerationStatus("Gemini 3.1 Flash Lite sedang memformulasikan prompt sinematik...");
         const characterContext = `${agentConfig.name}, ${agentConfig.currentOutfit || ''}, ${agentConfig.personality || ''}`;
-        finalPrompt = await generateVideoPromptWithAI(userIdea.trim(), characterContext, userProfile);
+        finalPrompt = await generateVideoPromptWithAI(userIdea.trim(), characterContext, userProfile, model, duration);
         setPrompt(finalPrompt);
       }
       if (!finalPrompt) {
-        finalPrompt = "cinematic motion, smooth camera push-in, natural motion, 4k";
+        finalPrompt = model === 'ltx2.3' 
+          ? "cinematic motion, smooth camera push-in, natural motion, 4k" 
+          : "cinematic motion, smooth camera push-in, natural motion, 4k";
       }
 
-      const videoResult = await generateWanVideo({
-        startImage,
-        endImage: endImage || null,
-        prompt: finalPrompt,
-        duration: duration, // Menggunakan nilai slider durasi yang dipilih pengguna
-        fps: 64,            // Smoothness 64 FPS
-        spaceUrl: userProfile?.hfVideoSpaceUrl || DEFAULT_WAN_VIDEO_SPACE_URL,
-        tokens: userProfile?.hfTokens || '',
-        identityImage,
-        identityStrength,
-        onStatusUpdate: (status) => setGenerationStatus(status)
-      });
+      let videoResult;
+      if (model === 'ltx2.3') {
+        videoResult = await generateLtxVideo({
+          startImage,
+          prompt: finalPrompt,
+          duration: duration,
+          spaceUrl: userProfile?.hfVideoSpaceUrl || DEFAULT_LTX_VIDEO_SPACE_URL,
+          tokens: userProfile?.hfTokens || '',
+          audioRefFile: audioRefFile,
+          audioRefEnabled,
+          audioRefGuidanceScale,
+          audioRefStemSep,
+          audioRefNormalize,
+          onStatusUpdate: (status) => setGenerationStatus(status)
+        });
+      } else {
+        videoResult = await generateWanVideo({
+          startImage,
+          endImage: endImage || null,
+          prompt: finalPrompt,
+          duration: duration,
+          fps: 64,
+          spaceUrl: userProfile?.hfVideoSpaceUrl || DEFAULT_WAN_VIDEO_SPACE_URL,
+          tokens: userProfile?.hfTokens || '',
+          identityImage,
+          identityStrength,
+          onStatusUpdate: (status) => setGenerationStatus(status)
+        });
+      }
 
       setGeneratedVideoUrl(videoResult);
 
-      // Konversi video ke base64 di memori lokal agar AI analisis bisa benar-benar melihat isi video secara utuh (inlineData)
+      // Konversi video ke base64... (sama seperti sebelumnya)
       let analysisVideoUrl = videoResult;
       if (!analysisVideoUrl.startsWith('data:')) {
         try {
@@ -226,7 +256,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
         }
       }
 
-      // Mulai analisa video otomatis di latar belakang agar komentar siap saat user klik 'Simpan ke Chat'
+      // Mulai analisa video... (sama seperti sebelumnya)
       generateVideoCommentaryWithAI({
         videoUrl: analysisVideoUrl,
         videoPrompt: finalPrompt,
@@ -241,7 +271,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
       });
     } catch (err: any) {
       console.error("[WanVideoModal] Generate Video Error:", err);
-      setErrorMessage(err?.message || "Gagal menghasilkan video. Pastikan token Hugging Face memiliki kuota ZeroGPU aktif.");
+      setErrorMessage(err?.message || "Gagal menghasilkan video.");
     } finally {
       setIsGenerating(false);
     }
@@ -252,7 +282,10 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
     if (!generatedVideoUrl) return;
     const link = document.createElement('a');
     link.href = generatedVideoUrl;
-    link.download = `wan22_video_${agentConfig.name.toLowerCase().replace(/\s+/g, '_')}_${duration.toFixed(1)}s_${Date.now()}.mp4`;
+    const now = new Date();
+    const dateStr = `${now.getDate().toString().padStart(2, '0')}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getFullYear()}`;
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}-${now.getSeconds().toString().padStart(2, '0')}`;
+    link.download = `story_${agentConfig.name.toLowerCase().replace(/\s+/g, '_')}_${dateStr}_${timeStr}.mp4`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -371,14 +404,11 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5">
-                  Wan 2.2 Video Studio
+                  Video Studio
                 </h2>
-                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/40">
-                  I2V Studio-2
-                </span>
               </div>
               <p className="text-[11px] text-white/50 font-medium">
-                Image-to-Video Engine · Durasi 5s · Smoothness 64 FPS · ZeroGPU
+                Image-to-Video Engine
               </p>
             </div>
           </div>
@@ -684,6 +714,65 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
             </div>
           </div>
 
+          {/* New Section: LTX 2.3 Audio Settings (Conditional) */}
+          {userProfile?.videoGeneratorModel === 'ltx2.3' && (
+            <div className="p-4 rounded-2xl bg-white/5 border-2 border-dashed border-violet-500/30 space-y-3">
+              <span className="text-xs font-black uppercase tracking-wider text-white/90">
+                Audio & Voice Clone Settings
+              </span>
+              
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={audioRefEnabled}
+                    onChange={(e) => setAudioRefEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-violet-500"
+                  />
+                  <label className="text-xs text-white/80">Enable Voice Clone</label>
+                </div>
+                
+                <div className={audioRefEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}>
+                  <button
+                    type="button"
+                    onClick={() => audioFileInputRef.current?.click()}
+                    disabled={!audioRefEnabled || isGenerating}
+                    className="w-full p-3 rounded-xl border border-dashed border-white/20 hover:border-violet-400/50 bg-black/20 text-center transition-all cursor-pointer"
+                  >
+                    <span className="text-xs text-white/60">
+                      {audioRefFile ? 'Audio Terunggah (Klik untuk Ganti)' : 'Upload Audio Reference (~4s)'}
+                    </span>
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={audioFileInputRef} 
+                    className="hidden" 
+                    accept="audio/*" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => setAudioRefFile(event.target?.result as string);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <label className="text-[10px] text-white/60">Identity Guidance Scale</label>
+                      <input 
+                        type="range" min="0" max="10" step="0.1" value={audioRefGuidanceScale}
+                        onChange={(e) => setAudioRefGuidanceScale(parseFloat(e.target.value))}
+                        className="w-full h-1 bg-white/10 rounded-lg accent-violet-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Section 2: Prompt & AI Prompt Director */}
           <div className="p-4 sm:p-5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -695,7 +784,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
                   Prompt & Prompt Engineering (Gemini 3.1 Flash Lite)
                 </label>
                 <p className="text-[11px] text-white/50">
-                  Tuliskan ide gerakan / aksi (termasuk aksi intim / eksplisit) dalam Bahasa Indonesia atau Inggris. AI Director akan memformulasikannya menjadi prompt bahasa Inggris sinematik tanpa sensor untuk Wan 2.2.
+                  Tuliskan ide gerakan / aksi (termasuk aksi intim / eksplisit) dalam Bahasa Indonesia atau Inggris. AI Director akan memformulasikannya menjadi prompt bahasa Inggris sinematik tanpa sensor untuk Image to Video.
                 </p>
               </div>
 
@@ -734,7 +823,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">
-                  Hasil Prompt Sinematik (Wan 2.2 I2V):
+                  Hasil Prompt Sinematik :
                 </span>
                 <span className="text-[10px] font-mono text-white/40">
                   {prompt.length} karakter
@@ -843,8 +932,8 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
             </div>
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-0.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Backend Engine</span>
-              <span className="font-mono font-black text-violet-300 truncate text-xs">Wan 2.2 I2V</span>
-              <span className="text-[9px] text-white/50">ZeroGPU Lightning 6-step</span>
+              <span className="font-mono font-black text-violet-300 truncate text-xs">Image-to-Video</span>
+              <span className="text-[9px] text-white/50">ZeroGPU</span>
             </div>
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-0.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">Token Status</span>
@@ -875,7 +964,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
                 />
               </div>
               <p className="text-[10px] text-white/50 leading-relaxed italic">
-                Tips: Wan 2.2 merender video dengan resolusi tinggi pada 64 FPS. Durasi proses rata-rata 30-90 detik tergantung antrean ZeroGPU.
+                Tips: Merender video dengan resolusi tinggi pada 64 FPS. Durasi proses rata-rata 30-90 detik tergantung antrean ZeroGPU.
               </p>
             </div>
           )}
@@ -939,7 +1028,7 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
         {/* Modal Footer / Action CTA */}
         <div className="sticky bottom-0 z-20 px-6 py-4 bg-zinc-950/90 backdrop-blur-xl border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-[11px] text-white/50 text-center sm:text-left">
-            <span>Wan 2.2 I2V Studio-2 · </span>
+            <span>Image to Video · </span>
             <span className="text-white/70">Start Frame (wajib)</span>
             <span> + </span>
             <span className="text-white/40">End Frame (opsional)</span>

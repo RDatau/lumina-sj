@@ -44,6 +44,9 @@ export const DEFAULT_QWEN_SPACE_HOST = 'https://bennie2390-qwen-image-edit-rapid
 export const DEFAULT_WAN_VIDEO_SPACE_URL = 'https://huggingface.co/spaces/Ben2390/Wan_2.2_I2V_Studio-2';
 export const DEFAULT_WAN_VIDEO_SPACE_HOST = 'https://ben2390-wan-2-2-i2v-studio-2.hf.space';
 
+export const DEFAULT_LTX_VIDEO_SPACE_URL = 'https://huggingface.co/spaces/rdata92/LTX-2.3-10Eros';
+export const DEFAULT_LTX_VIDEO_SPACE_HOST = 'https://rdata92-ltx-2-3-10eros.hf.space';
+
 // Memory cache untuk tracking token aktif agar rotasi berlanjut antar-request
 let currentTokenIndex = 0;
 const exhaustedTokensMap = new Map<string, number>(); // token -> timestamp saat limit (TTL 2 jam)
@@ -1442,5 +1445,169 @@ export const generateWanVideo = async (
   }
 
   throw new Error(`Gagal menghasilkan video di Wan 2.2 Space: ${errDetail}`);
+};
+
+export interface GenerateLtxVideoParams {
+  startImage: string;
+  prompt: string;
+  duration?: number;
+  spaceUrl?: string;
+  tokens?: string;
+  audioRefFile?: string | null;
+  audioRefEnabled?: boolean;
+  audioRefGuidanceScale?: number;
+  audioRefStemSep?: boolean;
+  audioRefNormalize?: boolean;
+  onStatusUpdate?: (status: string) => void;
+}
+
+export const generateLtxVideo = async (
+  params: GenerateLtxVideoParams
+): Promise<string> => {
+  const {
+    startImage,
+    prompt,
+    duration = 4.0,
+    spaceUrl,
+    tokens: rawTokens,
+    audioRefFile,
+    audioRefEnabled = false,
+    audioRefGuidanceScale = 3.0,
+    audioRefStemSep = false,
+    audioRefNormalize = true,
+    onStatusUpdate
+  } = params;
+
+  if (!startImage) {
+    throw new Error("Start Frame (gambar awal) diperlukan untuk LTX 2.3.");
+  }
+
+  const spaceHost = await normalizeHFSpaceUrl(spaceUrl || DEFAULT_LTX_VIDEO_SPACE_URL);
+  const tokens = parseHFTokens(rawTokens);
+
+  let enhancedPrompt = prompt.trim();
+  if (!enhancedPrompt.toLowerCase().includes('audio intent')) {
+    enhancedPrompt = `${enhancedPrompt} (Audio Intent: Suara latar yang natural dan dialog jelas yang menyatu dengan adegan sepanjang ${duration} detik, tanpa terpotong)`;
+  }
+
+  onStatusUpdate?.("Mendapatkan konfigurasi Space LTX 2.3...");
+  
+  let ltxEndpoint = '/generate';
+  try {
+    const configResp = await proxyFetch(`${spaceHost}/config`);
+    if (configResp.ok) {
+      const cfg = await configResp.json();
+      if (Array.isArray(cfg?.dependencies)) {
+        const dep = cfg.dependencies.find((d: any) => 
+          Array.isArray(d.outputs) && d.outputs.some((oid: number) => {
+            const comp = cfg.components?.find((c: any) => c.id === oid);
+            return comp?.type === 'video';
+          })
+        );
+        if (dep?.api_name) {
+          ltxEndpoint = `/${dep.api_name.replace(/^\/+/, '')}`;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[LTXVideo] Inspect config fallback to /generate", e);
+  }
+
+  const maxAttempts = Math.max(1, tokens.length);
+  let attempts = 0;
+  let lastError: any = null;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    const currentTokenObj = getNextAvailableToken(tokens);
+    const tokenToUse = currentTokenObj?.token || undefined;
+    const tokenDisplay = tokens.length > 0 ? `(Akun #${currentTokenIndex + 1}/${tokens.length})` : '';
+
+    onStatusUpdate?.(`Menghubungkan ke LTX 2.3 Space ${tokenDisplay}...`);
+
+    try {
+      onStatusUpdate?.("Mengunggah Start Frame ke LTX 2.3...");
+      const formattedStart = await uploadToGradio(spaceHost, startImage, tokenToUse);
+      if (!formattedStart) {
+        throw new Error("Gagal mengunggah Start Frame ke LTX 2.3.");
+      }
+
+      let formattedAudioRef: any = null;
+      if (audioRefEnabled && audioRefFile) {
+        onStatusUpdate?.("Mengunggah Audio Reference / Voice Clone...");
+        try {
+          formattedAudioRef = await uploadToGradio(spaceHost, audioRefFile, tokenToUse);
+        } catch (e) {
+          console.warn("[LTXVideo] Gagal upload audio reference:", e);
+        }
+      }
+
+      const negativePrompt = "captions, music, transition, VR, bad quality, subtitles, text, watermark, overlay effects, cartoon, childish, ugly, text, blur, logo, static, low quality, noise, mutant, horror, film grain";
+      
+      const payloadData = [
+        formattedStart,
+        enhancedPrompt,
+        negativePrompt,
+        "tuned",
+        duration,
+        1120,
+        1344,
+        "anchor only",
+        "",
+        0.9,
+        0.15,
+        0.08,
+        0.82,
+        -1,
+        true,
+        0,
+        1.15,
+        64,
+        false,
+        0.15, 0.15, 0.5, 0.6, 0.0, 0.0, 0.3, 0.8, 0.0, 0.0, 0.0, 0.0, 0.15,
+        0.15, 0.15, 0.5, 0.6, 0.0, 0.0, 0.3, 0.8, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0, 400, 0.3, 0.3,
+        "0.4824, 0.2412, 0.0",
+        "single image (i2v)",
+        null, null, null, null,
+        41, 1.0, 0.7,
+        false, "",
+        false, "", 2, 8, true, 0.25,
+        false, 1.0,
+        audioRefEnabled,
+        formattedAudioRef,
+        audioRefGuidanceScale,
+        audioRefStemSep,
+        audioRefNormalize,
+        null, 0.82, false,
+        null, 50, null, 50, null, 50, null, 50, null, 50,
+        "",
+        false
+      ];
+
+      onStatusUpdate?.("Mengirim tugas video LTX 2.3 ke ZeroGPU...");
+      const rawResult = await callGradioModernSSE(spaceHost, ltxEndpoint, payloadData, tokenToUse, onStatusUpdate);
+
+      onStatusUpdate?.("Menerima dan memproses video LTX 2.3...");
+      const videoResult = await extractVideoFromGradioOutput(rawResult, spaceHost, tokenToUse);
+      return videoResult;
+
+    } catch (err: any) {
+      lastError = err;
+      const errMsg = err?.message || String(err);
+      if (isQuotaOrLimitError(err) && tokenToUse) {
+        markTokenExhausted(tokenToUse);
+      }
+      if (isQuotaOrLimitError(err) && tokens.length > 1 && attempts < maxAttempts) {
+        rotateToken(tokens, onStatusUpdate);
+        continue;
+      } else {
+        break;
+      }
+    }
+  }
+
+  const errDetail = lastError?.message || String(lastError);
+  throw new Error(`Gagal menghasilkan video di LTX 2.3 Space: ${errDetail}`);
 };
 

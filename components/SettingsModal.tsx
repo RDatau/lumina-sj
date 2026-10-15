@@ -3,7 +3,7 @@ import { Eye, EyeOff, Key, Loader2, CheckCircle2, XCircle, Globe, Sparkles, Slid
 import { validateApiKey, parseGeminiApiKeys } from "../services/geminiService";
 import { GlobalAppearance, UserProfile } from '../types';
 import GlassDropdown from './GlassDropdown';
-import { saveGlobalGeminiSettingsSync, DEFAULT_QWEN_SPACE_URL } from '../services/dbService';
+import { saveGlobalGeminiSettingsSync, DEFAULT_QWEN_SPACE_URL, DEFAULT_WAN_VIDEO_SPACE_URL, DEFAULT_LTX_VIDEO_SPACE_URL } from '../services/dbService';
 import { testHuggingFaceSpace, parseHFTokens, HFTestResult } from '../services/huggingFaceService';
 import { 
   getNotificationSettings, 
@@ -1104,6 +1104,35 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                               <p className={`text-[8px] ${dynamicMutedTextColor} leading-relaxed`}>
                                 📌 <strong>Default Space:</strong> <code>Bennie2390 Experimental</code>. Anda bisa bebas mengubah URL ke Space Hugging Face mana saja jika Space default sedang bermasalah atau tidur (*sleeping*).
                               </p>
+                            </div>
+
+                            {/* Video Generator Model Selector */}
+                            <div className="space-y-1.5">
+                              <span className={`text-[9px] font-bold ${dynamicMutedTextColor} uppercase tracking-wider`}>
+                                Model Video Generator Utama
+                              </span>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => updateGlobalGemini({ 
+                                    videoGeneratorModel: "wan2.2",
+                                    hfVideoSpaceUrl: DEFAULT_WAN_VIDEO_SPACE_URL
+                                  })}
+                                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${(userProfile?.videoGeneratorModel || "wan2.2") === "wan2.2" ? "border-violet-500 bg-violet-500/20 text-white shadow-lg" : `${dynamicBorderColor} bg-white/5 text-white/60 hover:bg-white/10`}`}
+                                >
+                                  🎬 Wan 2.2
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateGlobalGemini({ 
+                                    videoGeneratorModel: "ltx2.3",
+                                    hfVideoSpaceUrl: DEFAULT_LTX_VIDEO_SPACE_URL
+                                  })}
+                                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${userProfile?.videoGeneratorModel === "ltx2.3" ? "border-violet-500 bg-violet-500/20 text-white shadow-lg" : `${dynamicBorderColor} bg-white/5 text-white/60 hover:bg-white/10`}`}
+                                >
+                                  🎞️ LTX 2.3 Audio
+                                </button>
+                              </div>
                             </div>
 
                             {/* Wan 2.2 Video Space URL */}
