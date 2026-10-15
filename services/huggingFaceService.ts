@@ -1393,9 +1393,20 @@ export const generateWanVideo = async (
         }
       }
 
+      // 2b. Upload Identity Image ke Gradio (jika ada)
+      let formattedIdentity: any = null;
+      if (identityImage) {
+        onStatusUpdate?.("Mempersiapkan Identity Lock...");
+        try {
+          formattedIdentity = await uploadToGradio(spaceHost, identityImage, tokenToUse);
+        } catch (e) {
+          console.warn("[WanVideo] Gagal upload Identity Frame:", e);
+        }
+      }
+
       // 3. Bangun payload 56 slot (Smoothness 64 FPS, Durasi 5.0 detik)
       onStatusUpdate?.(`Menyiapkan parameter Wan 2.2 (Durasi ${duration}s, ${fps} FPS)...`);
-      const payloadData = buildWanVideoPayload(formattedStart, formattedEnd, prompt, duration, fps, identityImage || null, identityStrength || 0.45);
+      const payloadData = buildWanVideoPayload(formattedStart, formattedEnd, prompt, duration, fps, formattedIdentity, identityStrength || 0.45);
 
       // 4. Kirim tugas video ke Space via Gradio Modern SSE
       onStatusUpdate?.("Mengirim tugas video ke Space ZeroGPU (Wan 2.2)...");
