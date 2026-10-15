@@ -50,6 +50,7 @@ export interface ChatMessage {
   video?: string; // Menyimpan base64 data atau URL video MP4 yang dihasilkan
   videoPrompt?: string; // Menyimpan prompt yang digunakan untuk generate video
   videoDuration?: number; // Durasi video dalam detik (Wan 2.2)
+  lastFrameImage?: string; // Menyimpan frame terakhir video sebagai referensi konteks pakaian & ruangan
   attachments?: Attachment[]; // Array untuk berbagai jenis file
   audio?: string; // Menyimpan base64 audio data untuk TTS
   timestamp: number;

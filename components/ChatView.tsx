@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AgentConfig, ChatMessage, Attachment, UserProfile, GlobalAppearance, ActiveGenerationTask, AppState } from '../types';
-import { generateAgentResponse, getSpeech, generatePAP, cleanResponseText, generateErrorMessage, reviseAgentResponseBasedOnImage, generateSmartTitle, isTtsModelStreamSupported, getActiveTtsModel, cleanRawCaptionToPureGarment, regeneratePapVariation, getAllGeminiApiKeys, generateVideoCommentaryWithAI } from '../services/geminiService';
+import { generateAgentResponse, getSpeech, generatePAP, cleanResponseText, generateErrorMessage, reviseAgentResponseBasedOnImage, generateSmartTitle, isTtsModelStreamSupported, getActiveTtsModel, cleanRawCaptionToPureGarment, regeneratePapVariation, getAllGeminiApiKeys, generateVideoCommentaryWithAI, extractVideoLastFrame } from '../services/geminiService';
 import { triggerNewMessageNotification } from '../services/notificationService';
 import ImageInfoModal from './ImageInfoModal';
 import WanVideoModal from './WanVideoModal';
+import VideoInfoModal from './VideoInfoModal';
 
 
 const decodeBase64 = (base64: string) => {
@@ -603,6 +604,20 @@ const ChatView: React.FC<ChatViewProps> = ({
     imageUrl: null,
   });
 
+  const [videoInfoData, setVideoInfoData] = useState<{
+    isOpen: boolean;
+    videoUrl: string | null;
+    videoPrompt?: string;
+    caption?: string;
+    duration?: number;
+    timestamp?: number;
+    agentName?: string;
+  }>({
+    isOpen: false,
+    videoUrl: null,
+    duration: 5.0,
+  });
+
   const [videoModalData, setVideoModalData] = useState<{
     isOpen: boolean;
     startImage: string | null;
@@ -640,6 +655,7 @@ const ChatView: React.FC<ChatViewProps> = ({
     setShowProfilePreview(false);
     setShowGallery(false);
     setImageInfoData(prev => ({ ...prev, isOpen: false }));
+    setVideoInfoData(prev => ({ ...prev, isOpen: false }));
     setVideoModalData(prev => ({ ...prev, isOpen: false }));
     setShowTranscript(false);
   };
@@ -652,7 +668,7 @@ const ChatView: React.FC<ChatViewProps> = ({
   };
 
   // Media Preview Back Button Handler (Android / Browser Back)
-  const isAnyModalOpen = Boolean(previewMedia || showProfilePreview || showGallery || imageInfoData.isOpen || showTranscript || videoModalData.isOpen);
+  const isAnyModalOpen = Boolean(previewMedia || showProfilePreview || showGallery || imageInfoData.isOpen || videoInfoData.isOpen || showTranscript || videoModalData.isOpen);
 
   useEffect(() => {
     if (isAnyModalOpen) {
@@ -1021,6 +1037,10 @@ const ChatView: React.FC<ChatViewProps> = ({
           }
         }
       }
+      if (msg.video && msg.lastFrameImage && !seen.has(msg.lastFrameImage)) {
+        seen.add(msg.lastFrameImage);
+        list.push({ url: msg.lastFrameImage, prompt: msg.videoPrompt || msg.text });
+      }
     }
     return list;
   }, [activeThread]);
@@ -1057,6 +1077,13 @@ const ChatView: React.FC<ChatViewProps> = ({
       }
     }
 
+    let lastFrameData: string | undefined = undefined;
+    try {
+      lastFrameData = await extractVideoLastFrame(videoUrl) || undefined;
+    } catch (e) {
+      console.warn("[handleVideoGeneratedFromModal] Failed to extract last frame:", e);
+    }
+
     const newMsg: ChatMessage = {
       id: `msg-vid-${Date.now()}`,
       role: 'agent',
@@ -1064,7 +1091,7 @@ const ChatView: React.FC<ChatViewProps> = ({
       video: videoUrl,
       videoPrompt: promptStr,
       videoDuration: durationSec,
-      // Omit image: startImg so start frame image is NOT shown in the video chat balloon
+      lastFrameImage: lastFrameData,
       timestamp: Date.now(),
       parentId: currentParentId,
       agentId: config.id,
@@ -2815,31 +2842,71 @@ const ChatView: React.FC<ChatViewProps> = ({
 
                 {/* Video Bubble Display */}
                 {m.video && (
-                  <div className={`mb-4 overflow-hidden rounded-2xl border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'} relative group/video bg-black/70 shadow-2xl`}>
+                  <div 
+                    className={`mb-4 overflow-hidden rounded-2xl border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'} relative group/video bg-black/70 shadow-2xl cursor-pointer`}
+                    onClick={() => setPreviewMedia({ name: 'Video Wan 2.2', mimeType: 'video/mp4', data: m.video!, id: m.id })}
+                  >
                     <video 
+                      ref={(el) => {
+                        if (!el) return;
+                        if ((el as any).__observer) return;
+                        const observer = new IntersectionObserver(
+                          (entries) => {
+                            entries.forEach((entry) => {
+                              if (entry.isIntersecting) {
+                                el.play().catch(() => {});
+                              } else {
+                                el.pause();
+                              }
+                            });
+                          },
+                          { threshold: 0.3 }
+                        );
+                        observer.observe(el);
+                        (el as any).__observer = observer;
+                      }}
                       src={m.video} 
-                      controls 
+                      autoPlay
+                      muted
+                      loop
                       playsInline
-                      className="w-full max-h-96 object-contain rounded-2xl bg-black" 
+                      className="w-full max-h-96 object-contain rounded-2xl bg-black pointer-events-none" 
                     />
+
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover/video:opacity-100 transition-all pointer-events-none">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    </div>
+
+                    {/* Action buttons (Download & Info) floating overlay */}
+                    <div className="absolute top-3 right-3 flex flex-col gap-1.5 opacity-90 md:opacity-0 md:group-hover/video:opacity-100 transition-all z-10">
+                      <button onClick={(e) => { 
+                        e.stopPropagation(); 
+                        const d = new Date(m.timestamp);
+                        const dateStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}_${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
+                        const vidIndex = activeThread.filter((msg, i) => i <= activeThread.indexOf(m) && msg.video).length;
+                        downloadMedia(m.video!, `wan22_${getSafeAgentName()}_${dateStr}_${vidIndex}.mp4`, 'video/mp4'); 
+                      }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Unduh Video MP4"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg></button>
+
+                      <button onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setVideoInfoData({
+                          isOpen: true,
+                          videoUrl: m.video!,
+                          videoPrompt: m.videoPrompt || m.text,
+                          caption: m.text,
+                          duration: m.videoDuration || 5.0,
+                          timestamp: m.timestamp,
+                          agentName: config.name
+                        });
+                      }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Informasi Video"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></button>
+                    </div>
+
                     <div className="p-3 bg-black/60 backdrop-blur-md flex items-center justify-between text-xs text-white/90 border-t border-white/10">
                       <div className="flex items-center gap-2 font-mono text-[10px]">
                         <span className="px-2 py-0.5 rounded-full bg-violet-600/40 text-violet-300 border border-violet-500/50 font-bold uppercase tracking-wider">
                           🎬 Wan 2.2 Video
                         </span>
                         <span className="text-white/60 font-medium">64 FPS · {m.videoDuration ? `${m.videoDuration.toFixed(1)}s` : '5.0s'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => downloadMedia(m.video!, `wan22_${getSafeAgentName()}_${Date.now()}.mp4`, 'video/mp4')}
-                          className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-[10px] font-bold text-white transition-all flex items-center gap-1 cursor-pointer"
-                          title="Unduh Video MP4"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                          Unduh MP4
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -4166,6 +4233,20 @@ const ChatView: React.FC<ChatViewProps> = ({
           const matchMsg = activeThread.find(m => m.image === imgUrl);
           handleOpenVideoModal(imgUrl, pr, matchMsg?.id || activeMessageId);
         }}
+      />
+
+      {/* Video Info (i) Modal */}
+      <VideoInfoModal
+        isOpen={videoInfoData.isOpen}
+        onClose={() => setVideoInfoData(prev => ({ ...prev, isOpen: false }))}
+        videoUrl={videoInfoData.videoUrl}
+        videoPrompt={videoInfoData.videoPrompt}
+        caption={videoInfoData.caption}
+        duration={videoInfoData.duration}
+        timestamp={videoInfoData.timestamp}
+        agentName={videoInfoData.agentName || config.name}
+        isBackgroundDark={isBackgroundDark}
+        themeHex={themeHex}
       />
 
       {/* Wan 2.2 Video Studio Modal */}

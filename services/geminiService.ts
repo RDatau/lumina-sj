@@ -926,7 +926,10 @@ const retryOperation = async (
  * Menurunkan state "efektif" (outfit, timestamp) dari riwayat pesan untuk isolasi memori antar cabang.
  */
 export const getEffectiveState = (config: AgentConfig, userProfile: UserProfile | undefined, history: ChatMessage[], currentRequest?: string) => {
-  const papsInHistory = history.filter(m => !!m.image).sort((a, b) => b.timestamp - a.timestamp);
+  const papsInHistory = history.filter(m => !!m.image || !!m.lastFrameImage || !!m.video).map(m => ({
+    ...m,
+    image: m.image || m.lastFrameImage || undefined
+  })).filter(m => !!m.image).sort((a, b) => b.timestamp - a.timestamp);
   const latestPap = papsInHistory.length > 0 ? papsInHistory[0] : null;
   const isUserAskingToChangeOutfit = (history.length > 0 && /ganti baju|ganti pakaian|pake baju lain|change outfit|pake dress lain/i.test(history[history.length-1].text)) || 
                                      (currentRequest && /ganti baju|ganti pakaian|pake baju lain|change outfit|pake dress lain/i.test(currentRequest));
@@ -2130,6 +2133,84 @@ export const extractVideoFrames = async (videoUrl: string, maxFrames = 3): Promi
   });
 };
 
+/**
+ * Mengekstrak frame terakhir dari video untuk referensi konteks pakaian dan ruangan percakapan selanjutnya
+ */
+export const extractVideoLastFrame = async (videoUrl: string): Promise<string | null> => {
+  if (typeof document === 'undefined' || !videoUrl) return null;
+  return new Promise<string | null>((resolve) => {
+    try {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      let isFinished = false;
+      const cleanup = () => {
+        if (isFinished) return;
+        isFinished = true;
+        clearTimeout(timeout);
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch {}
+      };
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        resolve(null);
+      }, 6000);
+
+      video.onloadedmetadata = async () => {
+        try {
+          const duration = video.duration && !isNaN(video.duration) && video.duration > 0 ? video.duration : 5;
+          const origW = video.videoWidth || 512;
+          const origH = video.videoHeight || 512;
+          const targetW = Math.min(origW, 512);
+          const scale = targetW / origW;
+          const targetH = Math.round(origH * scale);
+          
+          canvas.width = targetW;
+          canvas.height = targetH;
+
+          video.currentTime = Math.max(0.1, duration - 0.2);
+        } catch (err) {
+          cleanup();
+          resolve(null);
+        }
+      };
+
+      video.onseeked = () => {
+        try {
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            cleanup();
+            resolve(dataUrl);
+            return;
+          }
+        } catch (e) {}
+        cleanup();
+        resolve(null);
+      };
+
+      video.onerror = () => {
+        cleanup();
+        resolve(null);
+      };
+
+      video.src = videoUrl;
+    } catch (outerErr) {
+      resolve(null);
+    }
+  });
+};
+
 export interface GenerateVideoCommentaryParams {
   videoUrl: string;
   videoPrompt: string;
@@ -2533,7 +2614,10 @@ Output ONLY the English translation without preamble, quotes, explanations, or l
   // 4. Apakah ini foto grup/berdua (secara visual)?
   const isJointShot = isTogether || isTogetherGeneral;
 
-  const papsInHistory = history.filter(m => !!m.image).sort((a, b) => b.timestamp - a.timestamp);
+  const papsInHistory = history.filter(m => !!m.image || !!m.lastFrameImage || !!m.video).map(m => ({
+    ...m,
+    image: m.image || m.lastFrameImage || undefined
+  })).filter(m => !!m.image).sort((a, b) => b.timestamp - a.timestamp);
   const latestPap = papsInHistory.length > 0 ? papsInHistory[0] : null;
   const hasPreviousPap = !!latestPap?.image;
   const isContinuingOutfit = latestPap && effectiveConfig.currentOutfit === latestPap.outfit;
