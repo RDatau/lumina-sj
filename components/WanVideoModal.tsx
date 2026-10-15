@@ -50,9 +50,12 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
   const [isSavingToChat, setIsSavingToChat] = useState<boolean>(false);
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [identityImage, setIdentityImage] = useState<string | null>(null);
+  const [identityStrength, setIdentityStrength] = useState<number>(0.45);
 
   const startFileInputRef = useRef<HTMLInputElement>(null);
   const endFileInputRef = useRef<HTMLInputElement>(null);
+  const identityFileInputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<any>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
 
@@ -112,6 +115,18 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
     reader.onload = (event) => {
       const result = event.target?.result as string;
       if (result) setEndImage(result);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleIdentityFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) setIdentityImage(result);
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -528,6 +543,55 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* New Section: Identity Lock */}
+          <div className="flex flex-col gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 relative">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-white/90 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                Identity Lock (Opsional)
+              </span>
+              <button
+                type="button"
+                onClick={() => identityFileInputRef.current?.click()}
+                disabled={isGenerating}
+                className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+              >
+                {identityImage ? 'Ganti Foto' : 'Unggah Foto'}
+              </button>
+            </div>
+            
+            <input 
+              type="file" 
+              ref={identityFileInputRef} 
+              className="hidden" 
+              accept="image/*" 
+              onChange={handleIdentityFileChange} 
+            />
+
+            {identityImage && (
+              <div className="mt-2 relative w-20 h-20 rounded-xl overflow-hidden bg-black/40 border border-white/10">
+                <img src={identityImage} alt="Identity Lock" className="w-full h-full object-cover" />
+              </div>
+            )}
+
+            <div className="mt-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-white/70">At most this strong</span>
+                <span className="text-sm font-black text-amber-400">{identityStrength.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={identityStrength}
+                onChange={(e) => setIdentityStrength(parseFloat(e.target.value))}
+                disabled={isGenerating || !identityImage}
+                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-amber-400 disabled:opacity-40"
+              />
             </div>
           </div>
 
