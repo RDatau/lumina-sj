@@ -2240,26 +2240,30 @@ export const generateVideoCommentaryWithAI = async ({
 
   const lastChats = recentMessages.slice(-4).map(m => `${m.role === 'user' ? 'USER' : charName.toUpperCase()}: "${m.text}"`).join('\n');
 
-  const promptText = `Kamu adalah karakter bernama ${charName}.
-Kepribadian & Karakteristik kamu:
+  const promptText = `PANDUAN UTAMA: Kamu adalah karakter bernama ${charName}. Kamu baru saja merekam dan mengirimkan video gerak dirimu sendiri ke user di chat ini.
+PENTING: Tonton dan amati SEMUA frame video serta file video lengkap yang terlampir di atas dari awal, tengah, hingga akhir (bukan cuma frame awal!). Perhatikan dengan teliti bagaimana gerakan tubuh, pose, transisi gerakan, ekspresi wajah, dan perubahan adegan terjadi dari detik pertama sampai detik terakhir video.
+Komentari secara SANGAT SPESIFIK dan EKSKLUSIF apa yang benar-benar tampak dan terjadi di video itu dari awal sampai akhir (pakaian yang dikenakan, bentuk tubuh, pose, gerakan dinamis, ekspresi, suasana ruangan). Jangan pernah menggunakan kalimat general, klise, atau template statis!
+Hubungkan juga secara mulus dengan konteks obrolan atau nada pembicaraan terakhir dengan user, seolah kamu benar-benar sedang mengirim video itu untuk merespons chat-nya.
+
+KEPRIBADIAN & GAYA BICARA KAMU:
 "${agentConfig.personality}"
 ${agentConfig.enrichedPersona ? `Latar belakang detail: "${agentConfig.enrichedPersona}"` : ''}
 
-KONTEKS SITUASI:
-Kamu baru saja merekam/mengirimkan video gerak dirimu sendiri (video berdurasi ${duration.toFixed(1)} detik) ke user di obrolan chat ini!
-${videoPrompt ? `Deskripsi aksi & detail adegan video: "${videoPrompt}"` : ''}
+RIWAYAT OBROLAN TERAKHIR:
+${lastChats || "(Belum ada obrolan sebelumnya)"}
 
-${lastChats ? `RIWAYAT OBROLAN SEBELUMNYA:\n${lastChats}\n` : ''}
+DETAIL VIDEO:
+- Durasi: ${duration.toFixed(1)} detik
+- Deskripsi Adegan: "${videoPrompt || 'Video gerak diriku'}"
 
-TUGAS KAMU:
-Tulis pesan obrolan santai, ekspresif, dan manis/menggoda (1 sampai 2 kalimat, maksimal 3 kalimat) dari sudut pandang orang pertama ("aku" / "sayang") yang MENGOMENTARI apa yang kamu lakukan di dalam video tersebut!
-Jangan pernah pakai template kaku. Buat seolah-olah kamu baru saja merekam video itu khusus untuknya.
-- Bicarakan gerakanmu, ekspresi wajahmu, atau rasa malumu/senangmu saat bergerak di video tersebut.
-- JANGAN PERNAH berbicara teknis seperti "Berdasarkan video ini...", "Analisis visual...", "Sebagai AI...".
-- Tulis LANGSUNG kata-kata yang kamu ucapkan ke user.`;
+ATURAN MUTLAK PENULISAN PESAN/KOMENTAR VIDEO:
+1. Harus SANGAT EKSKLUSIF dan SPESIFIK mengomentari apa yang benar-benar tampak di video dari awal sampai akhir!
+2. Jika konteks obrolan intim/nakal/eksplisit, sesuaikan nada komentarmu secara blak-blakan, menggoda, nakal, dan sangat personal seolah kamu benar-benar sedang memperlihatkan dirimu kepada user.
+3. Gunakan sudut pandang orang pertama ("aku" / "kamu") sebagai pengirim video.
+4. Langsung tulis pesan/komentarnya saja (1-2 kalimat, tanpa intro AI, tanpa tanda kutip, tanpa penjelasan teknis).`;
 
   try {
-    const extractedFrames = await extractVideoFrames(videoUrl, 2);
+    const extractedFrames = await extractVideoFrames(videoUrl, 4);
     const parts: any[] = [];
 
     if (videoUrl.startsWith('data:video/mp4;base64,')) {
