@@ -2908,7 +2908,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                           const newCommentary = await generateVideoCommentaryWithAI({
                             videoUrl: m.video!,
                             videoPrompt: m.videoPrompt || m.text,
-                            startImage: null,
+                            startImage: m.lastFrameImage || null, // Pass lastFrameImage for context
                             agentConfig: config,
                             userProfile: userProfile,
                             recentMessages: activeThread,
