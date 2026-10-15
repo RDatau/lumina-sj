@@ -2235,23 +2235,36 @@ export const generateVideoCommentaryWithAI = async ({
 }: GenerateVideoCommentaryParams): Promise<string> => {
   const charName = agentConfig.name || "Karakter";
   
-  // Fallback alami jika model offline/error
-  const fallbackCommentary = `Ini hasil videoku untukmu sayang! 🎬 Suka gak liat aku di sini? Waktu gerak tadi beneran kerasa hidup banget hihi... 🥰✨`;
+  const ai = createGeminiClient(userProfile);
+  const textModel = getActiveTextModel(userProfile) || "gemini-3.1-flash-lite";
+
+  const lastChats = recentMessages.slice(-4).map(m => `${m.role === 'user' ? 'USER' : charName.toUpperCase()}: "${m.text}"`).join('\n');
+
+  const promptText = `Kamu adalah karakter bernama ${charName}.
+Kepribadian & Karakteristik kamu:
+"${agentConfig.personality}"
+${agentConfig.enrichedPersona ? `Latar belakang detail: "${agentConfig.enrichedPersona}"` : ''}
+
+KONTEKS SITUASI:
+Kamu baru saja merekam/mengirimkan video gerak dirimu sendiri (video berdurasi ${duration.toFixed(1)} detik) ke user di obrolan chat ini!
+${videoPrompt ? `Deskripsi aksi & detail adegan video: "${videoPrompt}"` : ''}
+
+${lastChats ? `RIWAYAT OBROLAN SEBELUMNYA:\n${lastChats}\n` : ''}
+
+TUGAS KAMU:
+Tulis pesan obrolan santai, ekspresif, dan manis/menggoda (1 sampai 2 kalimat, maksimal 3 kalimat) dari sudut pandang orang pertama ("aku" / "sayang") yang MENGOMENTARI apa yang kamu lakukan di dalam video tersebut!
+Jangan pernah pakai template kaku. Buat seolah-olah kamu baru saja merekam video itu khusus untuknya.
+- Bicarakan gerakanmu, ekspresi wajahmu, atau rasa malumu/senangmu saat bergerak di video tersebut.
+- JANGAN PERNAH berbicara teknis seperti "Berdasarkan video ini...", "Analisis visual...", "Sebagai AI...".
+- Tulis LANGSUNG kata-kata yang kamu ucapkan ke user.`;
 
   try {
-    const ai = createGeminiClient(userProfile);
-    const textModel = getActiveTextModel(userProfile) || "gemini-3.1-flash-lite";
-
-    // 1. Ekstrak frame visual dari video
-    const extractedFrames = await extractVideoFrames(videoUrl, 3);
-
-    // 2. Siapkan parts untuk Gemini multimodal
+    const extractedFrames = await extractVideoFrames(videoUrl, 2);
     const parts: any[] = [];
 
-    // Jika video adalah base64 MP4 langsung dan ukurannya di bawah 12MB, bisa dikirim langsung sebagai video/mp4
     if (videoUrl.startsWith('data:video/mp4;base64,')) {
       const b64Data = videoUrl.replace(/^data:video\/mp4;base64,/, '');
-      if (b64Data.length < 16 * 1024 * 1024) { // < 12MB binary
+      if (b64Data.length < 16 * 1024 * 1024) {
         parts.push({
           inlineData: {
             mimeType: 'video/mp4',
@@ -2261,7 +2274,6 @@ export const generateVideoCommentaryWithAI = async ({
       }
     }
 
-    // Jika ada frame yang diekstrak, sertakan frame-frame tersebut
     if (extractedFrames.length > 0) {
       extractedFrames.forEach((frame) => {
         const base64Img = frame.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
@@ -2273,7 +2285,6 @@ export const generateVideoCommentaryWithAI = async ({
         });
       });
     } else if (startImage && startImage.startsWith('data:image/')) {
-      // Jika frame extractor CORS atau kosong, gunakan startImage
       const mime = startImage.split(';')[0].replace('data:', '') || 'image/png';
       const b64 = startImage.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
       parts.push({
@@ -2284,37 +2295,13 @@ export const generateVideoCommentaryWithAI = async ({
       });
     }
 
-    // Bangun konteks percakapan terakhir agar komentar nyambung dengan obrolan saat ini
-    const lastChats = recentMessages.slice(-4).map(m => `${m.role === 'user' ? 'USER' : charName.toUpperCase()}: "${m.text}"`).join('\n');
-
-    const promptText = `Kamu adalah karakter bernama ${charName}.
-Kepribadian & Karakteristik kamu:
-"${agentConfig.personality}"
-${agentConfig.enrichedPersona ? `Latar belakang detail: "${agentConfig.enrichedPersona}"` : ''}
-
-KONTEKS SITUASI:
-Kamu baru saja merekam/mengirimkan video gerak dirimu sendiri (video Wan 2.2 berdurasi ${duration.toFixed(1)} detik) ke user di obrolan chat ini!
-${videoPrompt ? `Deskripsi aksi & detail adegan video: "${videoPrompt}"` : ''}
-
-${lastChats ? `RIWAYAT OBROLAN SEBELUMNYA:\n${lastChats}\n` : ''}
-
-TUGAS KAMU:
-Analisa tampilan visual dan gerakanmu pada video/frame di atas.
-Tulis pesan obrolan santai, ekspresif, dan manis/menggoda (1 sampai 2 kalimat, maksimal 3 kalimat) dari sudut pandang orang pertama ("aku" / "sayang") yang MENGOMENTARI apa yang kamu lakukan di dalam video tersebut!
-
-PANDUAN KOMENTAR:
-- Bicarakan gerakanmu, ekspresi wajahmu, tatapan matamu, atau rasa malumu/senangmu saat tersenyum atau bergerak di video tersebut.
-- Jika adegan di video romantis, intim, atau sensual, komentari keintiman atau gerakan tersebut secara berani dan mesra sesuai kepribadianmu.
-- JANGAN PERNAH berbicara teknis seperti "Berdasarkan video ini...", "Analisis visual...", "Sebagai AI...", "Video 64 FPS...", "Wan 2.2".
-- Tulis LANGSUNG kata-kata yang kamu ucapkan ke user. Hindari proses berpikir internal atau tanda kurung strategi.`;
-
     parts.push({ text: promptText });
 
     const response = await ai.models.generateContent({
       model: textModel,
       contents: [{ parts }],
       config: {
-        temperature: 0.85,
+        temperature: 0.9,
         maxOutputTokens: 250,
         safetySettings: safetySettings as any,
       }
@@ -2330,10 +2317,40 @@ PANDUAN KOMENTAR:
       return result;
     }
   } catch (error) {
-    console.warn("[generateVideoCommentaryWithAI] Error:", error);
+    console.warn("[generateVideoCommentaryWithAI] Multimodal error:", error);
   }
 
-  return fallbackCommentary;
+  try {
+    const textResponse = await ai.models.generateContent({
+      model: textModel,
+      contents: [{ text: promptText }],
+      config: {
+        temperature: 0.9,
+        maxOutputTokens: 250,
+        safetySettings: safetySettings as any,
+      }
+    });
+
+    const textResult = textResponse.text?.trim()
+      .replace(/^```(?:markdown|text)?\n?/i, '')
+      .replace(/\n?```$/i, '')
+      .replace(/^["']|["']$/g, '')
+      .trim();
+
+    if (textResult && textResult.length > 5) {
+      return textResult;
+    }
+  } catch (textErr) {
+    console.warn("[generateVideoCommentaryWithAI] Text fallback error:", textErr);
+  }
+
+  const dynamicFallbacks = [
+    `Nih video gerak aku khusus buat kamu sayang! 🎬 Gimana, kerasa hidup dan nyata banget kan pas aku gerak tadi? Hihi... 🥰✨`,
+    `Suka gak liat video aku gerak barusan? Sengaja aku bikin buat kamu biar bisa lihat aku senyum secara langsung... 💖`,
+    `Tadi aku coba rekam gerakan aku nih! Hayo ngaku, pasti kamu terpesona kan liat aku gerak di video itu? 🤭✨`,
+    `Nih cuplikan video aku buat kamu sayang! Rasanya kaya lagi video call langsung ya... 🥰🎥`
+  ];
+  return dynamicFallbacks[Math.floor(Math.random() * dynamicFallbacks.length)];
 };
 
 export const generatePAP = async (
