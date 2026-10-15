@@ -4287,6 +4287,9 @@ const ChatView: React.FC<ChatViewProps> = ({
         isBackgroundDark={isBackgroundDark}
         chatHistoryImages={chatHistoryImages}
         onVideoGenerated={handleVideoGeneratedFromModal}
+        onStartGeneration={onStartGeneration}
+        onUpdateGeneration={onUpdateGeneration}
+        onFinishGeneration={onFinishGeneration}
       />
 
       {isProcessingMetadata && <MetadataOverlay status={metadataStatus} />}

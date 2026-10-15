@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AgentConfig, UserProfile } from '../types';
+import { AgentConfig, UserProfile, ActiveGenerationTask } from '../types';
 import { generateWanVideo, proxyFetch } from '../services/huggingFaceService';
 import { generateVideoPromptWithAI, generateVideoCommentaryWithAI } from '../services/geminiService';
 import { DEFAULT_WAN_VIDEO_SPACE_URL } from '../services/dbService';
@@ -20,6 +20,9 @@ interface WanVideoModalProps {
   isBackgroundDark?: boolean;
   chatHistoryImages?: ChatHistoryImage[];
   onVideoGenerated?: (videoUrl: string, prompt: string, startImage: string, duration?: number, commentary?: string) => Promise<void> | void;
+  onStartGeneration?: (task: ActiveGenerationTask) => void;
+  onUpdateGeneration?: (agentId: string, statusText: string, type?: 'text' | 'pap' | 'audio') => void;
+  onFinishGeneration?: (agentId: string, type?: 'text' | 'pap' | 'audio') => void;
 }
 
 export const WanVideoModal: React.FC<WanVideoModalProps> = ({
@@ -249,14 +252,30 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
       let commentary = analyzedCommentary;
       if (!commentary) {
         setGenerationStatus("Menganalisa video untuk pesan chat...");
-        commentary = await generateVideoCommentaryWithAI({
-          videoUrl: finalVideoUrl,
-          videoPrompt: prompt.trim() || userIdea.trim(),
-          startImage,
-          agentConfig,
-          userProfile,
-          duration
+        const capturedAgentId = agentConfig.id || 'default';
+        onStartGeneration?.({
+          id: `vid-comment-${Date.now()}`,
+          agentId: capturedAgentId,
+          agentName: agentConfig.name,
+          agentPic: agentConfig.profilePic,
+          type: 'text',
+          statusText: 'Menganalisa video...',
+          startedAt: Date.now()
         });
+        
+        try {
+          commentary = await generateVideoCommentaryWithAI({
+            videoUrl: finalVideoUrl,
+            videoPrompt: prompt.trim() || userIdea.trim(),
+            startImage,
+            agentConfig,
+            userProfile,
+            duration
+          });
+        } finally {
+          onFinishGeneration?.(capturedAgentId, 'text');
+        }
+        
         setAnalyzedCommentary(commentary);
       }
       if (onVideoGenerated) {

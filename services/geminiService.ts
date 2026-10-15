@@ -2305,8 +2305,10 @@ ATURAN MUTLAK PENULISAN PESAN/KOMENTAR VIDEO:
       model: textModel,
       contents: [{ parts }],
       config: {
-        temperature: 0.9,
-        maxOutputTokens: 250,
+        temperature: 1.0,
+        topP: 0.98,
+        maxOutputTokens: 1000,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
         safetySettings: safetySettings as any,
       }
     });
