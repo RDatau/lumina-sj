@@ -2260,7 +2260,7 @@ ATURAN MUTLAK PENULISAN PESAN/KOMENTAR VIDEO:
 1. Harus SANGAT EKSKLUSIF dan SPESIFIK mengomentari apa yang benar-benar tampak di video dari awal sampai akhir!
 2. Jika konteks obrolan intim/nakal/eksplisit, sesuaikan nada komentarmu secara blak-blakan, menggoda, nakal, dan sangat personal seolah kamu benar-benar sedang memperlihatkan dirimu kepada user.
 3. Gunakan sudut pandang orang pertama ("aku" / "kamu") sebagai pengirim video.
-4. Langsung tulis pesan/komentarnya saja (1-2 kalimat, tanpa intro AI, tanpa tanda kutip, tanpa penjelasan teknis).`;
+4. Langsung tulis pesan/komentarnya saja (1-3 kalimat, tanpa intro AI, tanpa tanda kutip, tanpa penjelasan teknis).`;
 
   try {
     const extractedFrames = await extractVideoFrames(videoUrl, 4);
@@ -2321,7 +2321,11 @@ ATURAN MUTLAK PENULISAN PESAN/KOMENTAR VIDEO:
 
     // Enforce hard character/sentence limit as a safety fallback
     const sentences = result?.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const cappedResult = sentences?.slice(0, 10).join('. ') + (sentences && sentences.length > 10 ? '.' : '');
+    let cappedResult = sentences?.slice(0, 10).join('. ') + (sentences && sentences.length > 10 ? '.' : '');
+    
+    if (cappedResult && !/[.!?]$/.test(cappedResult)) {
+        cappedResult += '.';
+    }
 
     if (cappedResult && cappedResult.length > 5) {
       return cappedResult;
