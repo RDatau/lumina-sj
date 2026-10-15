@@ -2307,7 +2307,7 @@ ATURAN MUTLAK PENULISAN PESAN/KOMENTAR VIDEO:
       config: {
         temperature: 1.0,
         topP: 0.98,
-        maxOutputTokens: 1000,
+        maxOutputTokens: 1500,
         thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
         safetySettings: safetySettings as any,
       }
@@ -2319,8 +2319,12 @@ ATURAN MUTLAK PENULISAN PESAN/KOMENTAR VIDEO:
       .replace(/^["']|["']$/g, '')
       .trim();
 
-    if (result && result.length > 5) {
-      return result;
+    // Enforce hard character/sentence limit as a safety fallback
+    const sentences = result?.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const cappedResult = sentences?.slice(0, 4).join('. ') + (sentences && sentences.length > 4 ? '.' : '');
+
+    if (cappedResult && cappedResult.length > 5) {
+      return cappedResult;
     }
   } catch (error) {
     console.warn("[generateVideoCommentaryWithAI] Multimodal error:", error);

@@ -2859,14 +2859,49 @@ const ChatView: React.FC<ChatViewProps> = ({
                       <div className="absolute inset-0 bg-black/40 backdrop-blur-md" />
                     </div>
 
+                    <div className="absolute top-3 left-3 z-30 flex items-center gap-2 bg-black/50 backdrop-blur-md px-2 py-1 rounded-lg" onClick={(e) => e.stopPropagation()}>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-[9px] font-bold text-white uppercase tracking-wider">
+                        <input
+                          type="checkbox"
+                          defaultChecked={true}
+                          onChange={(e) => {
+                            const videoEl = document.getElementById(`vid-${m.id}`) as HTMLVideoElement;
+                            if (videoEl) {
+                              videoEl.loop = e.target.checked;
+                              if (!e.target.checked) videoEl.autoplay = false;
+                            }
+                          }}
+                          className="accent-white"
+                        />
+                        Loop
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-[9px] font-bold text-white uppercase tracking-wider">
+                        <input
+                          type="checkbox"
+                          defaultChecked={true}
+                          onChange={(e) => {
+                            const videoEl = document.getElementById(`vid-${m.id}`) as HTMLVideoElement;
+                            if (videoEl) {
+                              videoEl.autoplay = e.target.checked;
+                              if (e.target.checked) videoEl.play();
+                              else videoEl.pause();
+                            }
+                          }}
+                          className="accent-white"
+                        />
+                        Auto
+                      </label>
+                    </div>
+
                     <video 
+                      id={`vid-${m.id}`}
                       ref={(el) => {
                         if (!el) return;
                         if ((el as any).__observer) return;
                         const observer = new IntersectionObserver(
                           (entries) => {
                             entries.forEach((entry) => {
-                              if (entry.isIntersecting) {
+                              if (entry.isIntersecting && el.autoplay) {
                                 el.play().catch(() => {});
                               } else {
                                 el.pause();
@@ -2883,13 +2918,14 @@ const ChatView: React.FC<ChatViewProps> = ({
                       muted
                       loop
                       playsInline
-                      className="relative z-10 w-full max-h-96 object-contain rounded-2xl pointer-events-none" 
+                      className="relative z-10 w-full max-h-96 object-contain rounded-2xl cursor-pointer"
+                      onClick={(e) => {
+                        const videoEl = e.currentTarget;
+                        if (videoEl.paused) videoEl.play();
+                        else videoEl.pause();
+                      }}
                     />
-
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover/video:opacity-100 transition-all pointer-events-none z-20">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                    </div>
-
+                    
                     {/* Action buttons (Download, Regenerate Caption & Info) floating overlay */}
                     <div className="absolute top-3 right-3 flex flex-col gap-1.5 opacity-90 md:opacity-0 md:group-hover/video:opacity-100 transition-all z-30">
                       <button onClick={(e) => { 
