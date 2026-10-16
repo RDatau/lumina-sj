@@ -658,13 +658,14 @@ const ChatView: React.FC<ChatViewProps> = ({
     setVideoInfoData(prev => ({ ...prev, isOpen: false }));
     setVideoModalData(prev => ({ ...prev, isOpen: false }));
     setShowTranscript(false);
+
+    if (window.history.state && window.history.state.isMediaPreview) {
+      window.history.back();
+    }
   };
 
   const handleCloseMediaModal = () => {
     closeAllModals();
-    if (window.history.state && window.history.state.isMediaPreview) {
-      window.history.back();
-    }
   };
 
   // Media Preview Back Button Handler (Android / Browser Back)
@@ -4327,7 +4328,7 @@ const ChatView: React.FC<ChatViewProps> = ({
       {/* Image Info (i) Modal */}
       <ImageInfoModal
         isOpen={imageInfoData.isOpen}
-        onClose={() => setImageInfoData(prev => ({ ...prev, isOpen: false }))}
+        onClose={handleCloseMediaModal}
         imageUrl={imageInfoData.imageUrl}
         imagePrompt={imageInfoData.imagePrompt}
         caption={imageInfoData.caption}
@@ -4345,7 +4346,7 @@ const ChatView: React.FC<ChatViewProps> = ({
       {/* Video Info (i) Modal */}
       <VideoInfoModal
         isOpen={videoInfoData.isOpen}
-        onClose={() => setVideoInfoData(prev => ({ ...prev, isOpen: false }))}
+        onClose={handleCloseMediaModal}
         videoUrl={videoInfoData.videoUrl}
         videoPrompt={videoInfoData.videoPrompt}
         caption={videoInfoData.caption}
@@ -4359,7 +4360,7 @@ const ChatView: React.FC<ChatViewProps> = ({
       {/* Wan 2.2 Video Studio Modal */}
       <WanVideoModal
         isOpen={videoModalData.isOpen}
-        onClose={() => setVideoModalData(prev => ({ ...prev, isOpen: false }))}
+        onClose={handleCloseMediaModal}
         initialStartImage={videoModalData.startImage}
         initialPrompt={videoModalData.prompt}
         userProfile={userProfile}

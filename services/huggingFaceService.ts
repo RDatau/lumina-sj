@@ -680,6 +680,10 @@ const isQuotaOrLimitError = (err: any): boolean => {
     msg.includes('zerogpu limit') ||
     msg.includes('zerogpu quota') ||
     msg.includes('antrean gpu penuh') ||
+    msg.includes('duration') ||
+    msg.includes('zerogpu illegal duration') ||
+    msg.includes('subscribe') ||
+    msg.includes('pro') ||
     msg.includes('429')
   );
 };
@@ -1440,6 +1444,9 @@ export const generateWanVideo = async (
   }
 
   const errDetail = lastError?.message || String(lastError);
+  if (errDetail.toLowerCase().includes('duration') || errDetail.toLowerCase().includes('subscribe') || errDetail.toLowerCase().includes('pro')) {
+    throw new Error(`ZeroGPU Batasan Durasi: Space meminta durasi GPU yang melebihi batas akun gratis (Free Tier). Silakan gunakan token akun Hugging Face Pro di Pengaturan.`);
+  }
   if (isQuotaOrLimitError(lastError)) {
     throw new Error(`Semua kuota ZeroGPU akun Hugging Face Anda telah habis (${tokens.length} akun dicek). Silakan ganti atau tambahkan token akun lain di Pengaturan.`);
   }
@@ -1608,6 +1615,12 @@ export const generateLtxVideo = async (
   }
 
   const errDetail = lastError?.message || String(lastError);
+  if (errDetail.toLowerCase().includes('duration') || errDetail.toLowerCase().includes('subscribe') || errDetail.toLowerCase().includes('pro')) {
+    throw new Error(`ZeroGPU Batasan Durasi: Space LTX 2.3 meminta durasi GPU yang melebihi batas akun gratis (Free Tier). Silakan gunakan token akun Hugging Face Pro di Pengaturan.`);
+  }
+  if (isQuotaOrLimitError(lastError)) {
+    throw new Error(`Semua kuota ZeroGPU akun Hugging Face Anda telah habis (${tokens.length} akun dicek). Silakan ganti atau tambahkan token akun lain di Pengaturan.`);
+  }
   throw new Error(`Gagal menghasilkan video di LTX 2.3 Space: ${errDetail}`);
 };
 

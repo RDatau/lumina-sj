@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AgentConfig, UserProfile, ActiveGenerationTask } from '../types';
-import { generateWanVideo, generateLtxVideo, proxyFetch } from '../services/huggingFaceService';
+import { generateWanVideo, generateLtxVideo, proxyFetch, DEFAULT_LTX_VIDEO_SPACE_URL } from '../services/huggingFaceService';
 import { generateVideoPromptWithAI, generateVideoCommentaryWithAI } from '../services/geminiService';
 import { DEFAULT_WAN_VIDEO_SPACE_URL } from '../services/dbService';
 

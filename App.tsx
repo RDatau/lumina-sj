@@ -22,6 +22,10 @@ const DEFAULT_BG = 'https://www.gstatic.com/images/branding/product/2x/google_ch
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.PROFILE_SELECT);
+  const appStateRef = useRef<AppState>(appState);
+  useEffect(() => {
+    appStateRef.current = appState;
+  }, [appState]);
   
   // Navigation handling for Android back button/gestures
   const handleNavigate = (newState: AppState, replace = false) => {
@@ -394,11 +398,6 @@ const App: React.FC = () => {
   const handleFinishGeneration = (agentId: string, type?: 'text' | 'pap' | 'audio') => {
     setActiveGenerations(prev => prev.filter(t => t.agentId !== agentId));
   };
-
-  const appStateRef = useRef<AppState>(appState);
-  useEffect(() => {
-    appStateRef.current = appState;
-  }, [appState]);
 
   useEffect(() => {
     currentAgentIdRef.current = config.id;
