@@ -921,6 +921,72 @@ const ChatView: React.FC<ChatViewProps> = ({
   const [previewVideoDuration, setPreviewVideoDuration] = useState(0);
   const [previewVideoLoop, setPreviewVideoLoop] = useState<boolean>(true);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const previewAmbientVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [isVideoGlowEnabled, setIsVideoGlowEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('video_ambient_glow');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleVideoGlow = (val: boolean) => {
+    setIsVideoGlowEnabled(val);
+    try {
+      localStorage.setItem('video_ambient_glow', String(val));
+    } catch {}
+    if (val && previewAmbientVideoRef.current && previewVideoRef.current) {
+      previewAmbientVideoRef.current.currentTime = previewVideoRef.current.currentTime;
+      if (previewVideoPlaying) {
+        previewAmbientVideoRef.current.play().catch(() => {});
+      }
+    } else if (!val && previewAmbientVideoRef.current) {
+      previewAmbientVideoRef.current.pause();
+      previewAmbientVideoRef.current.src = "";
+    }
+  };
+
+  // Performance Optimization: Cache base64 data URLs as lightweight native Blob URLs
+  const [previewVideoBlobUrl, setPreviewVideoBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!previewMedia || !previewMedia.data) {
+      if (previewVideoBlobUrl) {
+        URL.revokeObjectURL(previewVideoBlobUrl);
+        setPreviewVideoBlobUrl(null);
+      }
+      return;
+    }
+
+    const isVideo = previewMedia.mimeType?.startsWith('video/') || previewMedia.name?.endsWith('.mp4') || previewMedia.data.startsWith('data:video');
+    if (isVideo && previewMedia.data.startsWith('data:')) {
+      try {
+        const parts = previewMedia.data.split(',');
+        const byteString = atob(parts[1]);
+        const mime = parts[0].split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ab], { type: mime || 'video/mp4' });
+        const objectUrl = URL.createObjectURL(blob);
+        setPreviewVideoBlobUrl(objectUrl);
+
+        return () => {
+          URL.revokeObjectURL(objectUrl);
+        };
+      } catch (e) {
+        console.warn("Fallback to data URL:", e);
+        setPreviewVideoBlobUrl(null);
+      }
+    } else {
+      setPreviewVideoBlobUrl(null);
+    }
+  }, [previewMedia?.data]);
+
+  const lastVideoTimeUpdateRef = useRef<number>(0);
   const isMounted = useRef(true);
 
   const stopStreamingAudio = () => {
@@ -1148,8 +1214,16 @@ const ChatView: React.FC<ChatViewProps> = ({
 
   const togglePreviewVideo = () => {
     if (previewVideoRef.current) {
-      if (previewVideoPlaying) previewVideoRef.current.pause();
-      else previewVideoRef.current.play();
+      if (previewVideoPlaying) {
+        previewVideoRef.current.pause();
+        if (previewAmbientVideoRef.current) previewAmbientVideoRef.current.pause();
+      } else {
+        previewVideoRef.current.play().catch(() => {});
+        if (previewAmbientVideoRef.current && isVideoGlowEnabled) {
+          previewAmbientVideoRef.current.currentTime = previewVideoRef.current.currentTime;
+          previewAmbientVideoRef.current.play().catch(() => {});
+        }
+      }
       setPreviewVideoPlaying(!previewVideoPlaying);
     }
   };
@@ -1162,9 +1236,19 @@ const ChatView: React.FC<ChatViewProps> = ({
   };
 
   const handleVideoTimeUpdate = () => {
-    if (previewVideoRef.current) {
-      const progress = (previewVideoRef.current.currentTime / previewVideoRef.current.duration) * 100;
-      setPreviewVideoProgress(progress || 0);
+    const video = previewVideoRef.current;
+    if (video) {
+      if (isVideoGlowEnabled && previewAmbientVideoRef.current) {
+        if (Math.abs(previewAmbientVideoRef.current.currentTime - video.currentTime) > 0.3) {
+          previewAmbientVideoRef.current.currentTime = video.currentTime;
+        }
+      }
+      const now = performance.now();
+      if (now - lastVideoTimeUpdateRef.current > 200) {
+        lastVideoTimeUpdateRef.current = now;
+        const progress = (video.currentTime / (video.duration || 1)) * 100;
+        setPreviewVideoProgress(progress || 0);
+      }
     }
   };
 
@@ -1192,6 +1276,9 @@ const ChatView: React.FC<ChatViewProps> = ({
     if (previewVideoRef.current) {
       const time = (parseFloat(e.target.value) / 100) * previewVideoRef.current.duration;
       previewVideoRef.current.currentTime = time;
+      if (previewAmbientVideoRef.current) {
+        previewAmbientVideoRef.current.currentTime = time;
+      }
       setPreviewVideoProgress(parseFloat(e.target.value));
     }
   };
@@ -3824,7 +3911,7 @@ const ChatView: React.FC<ChatViewProps> = ({
 
       {previewMedia && (
         <div 
-          className="fixed inset-y-0 right-0 left-0 md:left-20 z-[300] h-full flex flex-col bg-[#0a0f14] backdrop-blur-3xl animate-in fade-in duration-300 select-none overflow-hidden" 
+          className="fixed inset-y-0 right-0 left-0 md:left-20 z-[300] h-full flex flex-col bg-[#0a0f14] animate-in fade-in duration-300 select-none overflow-hidden" 
           onClick={handleCloseMediaModal}
           onContextMenu={(e) => handleBgContextMenu(e)}
           onTouchStart={(e) => {
@@ -4158,54 +4245,125 @@ const ChatView: React.FC<ChatViewProps> = ({
                          </div>
                        </div>
                      ) : item.type === 'video' ? (
-                       <div className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden pb-14" key={item.data}>
-                          {/* Ambient Light Mode Background */}
-                          <div className="absolute inset-0 z-0">
-                            {item.data && (
-                              <video 
-                                src={item.data} 
-                                className="w-full h-full object-cover blur-[100px] opacity-40 scale-125"
-                                muted
-                                loop
-                                playsInline
-                                ref={(el) => {
-                                  if (el && previewVideoRef.current) {
-                                    el.currentTime = previewVideoRef.current.currentTime;
-                                    if (previewVideoPlaying) el.play().catch(() => {});
-                                    else el.pause();
-                                  }
-                                }}
-                              />
-                            )}
-                            <div className="absolute inset-0 bg-black/40"></div>
-                          </div>
+                        <div className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden pb-14" key={item.data}>
+                           {/* Ambient Light Mode Background with Vibrant Glow - Completely unmounted when OFF */}
+                           {isVideoGlowEnabled && (
+                             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none animate-in fade-in duration-300">
+                               {item.data && (
+                                 <video 
+                                   ref={previewAmbientVideoRef}
+                                   src={previewVideoBlobUrl || item.data} 
+                                   className="w-full h-full object-cover blur-2xl md:blur-[80px] opacity-70 scale-125 saturate-150"
+                                   muted
+                                   loop
+                                   autoPlay
+                                   playsInline
+                                 />
+                               )}
+                               <div className="absolute inset-0 bg-black/25 backdrop-blur-[1px]"></div>
+                             </div>
+                           )}
 
-                          {/* Main Video */}
-                          {item.data && (
-                            <video 
-                              ref={previewVideoRef}
-                              src={item.data} 
-                              className="relative z-10 max-w-full max-h-full object-contain shadow-2xl"
-                              autoPlay
-                              playsInline
-                              onTimeUpdate={handleVideoTimeUpdate}
-                              onLoadedMetadata={handleVideoLoadedMetadata}
-                              onEnded={() => {
-                                 if (previewVideoLoop) {
-                                   if (previewVideoRef.current) {
-                                     previewVideoRef.current.currentTime = 0;
-                                     previewVideoRef.current.play().catch(() => {});
-                                     setPreviewVideoPlaying(true);
-                                   }
-                                 } else {
-                                   setPreviewVideoPlaying(false);
+                           {/* Floating Ambient Glow Toggle Control (Video) - Menyesuaikan Mobile & Desktop Wide */}
+                           <div 
+                             className="absolute top-4 right-4 sm:top-4 sm:right-6 z-30 flex items-center gap-2 bg-[#0a0f14]/85 hover:bg-[#0a0f14] backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-2xl transition-all select-none"
+                             onClick={(e) => e.stopPropagation()}
+                           >
+                             <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/90">
+                               <svg xmlns="http://www.w3.org/2000/svg" className={`h-3.5 w-3.5 transition-all duration-300 ${isVideoGlowEnabled ? "text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.9)] animate-pulse" : "text-white/40"}`} viewBox="0 0 24 24" fill="currentColor">
+                                 <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z" />
+                               </svg>
+                               <span className="font-semibold tracking-wide">Ambient Glow</span>
+                             </div>
+
+                             {/* Radio / Toggle switch buttons */}
+                             <div 
+                               className="flex items-center bg-black/60 p-0.5 rounded-full border border-white/10 shadow-inner" 
+                               role="radiogroup" 
+                               aria-label="Toggle Efek Glow Ambient"
+                             >
+                               <button
+                                 type="button"
+                                 role="radio"
+                                 aria-checked={isVideoGlowEnabled}
+                                 onClick={(e) => { e.stopPropagation(); handleToggleVideoGlow(true); }}
+                                 className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 ${
+                                   isVideoGlowEnabled 
+                                     ? "bg-gradient-to-r from-amber-400 to-orange-500 text-black font-extrabold shadow-[0_0_12px_rgba(251,191,36,0.6)] scale-105" 
+                                     : "text-white/40 hover:text-white hover:bg-white/5"
+                                 }`}
+                                 title="Nyalakan Efek Glow (ON)"
+                               >
+                                 <span className={`w-1.5 h-1.5 rounded-full ${isVideoGlowEnabled ? "bg-black" : "bg-transparent"}`} />
+                                 ON
+                               </button>
+                               <button
+                                 type="button"
+                                 role="radio"
+                                 aria-checked={!isVideoGlowEnabled}
+                                 onClick={(e) => { e.stopPropagation(); handleToggleVideoGlow(false); }}
+                                 className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                   !isVideoGlowEnabled 
+                                     ? "bg-white/20 text-white font-extrabold shadow-sm scale-105 border border-white/10" 
+                                     : "text-white/40 hover:text-white hover:bg-white/5"
+                                 }`}
+                                 title="Matikan Efek Glow (OFF)"
+                               >
+                                 OFF
+                               </button>
+                             </div>
+                           </div>
+
+                           {/* Main Video */}
+                           {item.data && (
+                             <video 
+                               ref={previewVideoRef}
+                               src={previewVideoBlobUrl || item.data} 
+                               className="relative z-10 max-w-full max-h-full object-contain shadow-2xl"
+                               autoPlay
+                               playsInline
+                               onPlay={() => {
+                                 setPreviewVideoPlaying(true);
+                                 if (previewAmbientVideoRef.current && isVideoGlowEnabled) {
+                                   previewAmbientVideoRef.current.play().catch(() => {});
                                  }
                                }}
-                              onClick={(e) => { e.stopPropagation(); togglePreviewVideo(); }}
-                            />
-                          )}
+                               onPause={() => {
+                                 setPreviewVideoPlaying(false);
+                                 if (previewAmbientVideoRef.current) {
+                                   previewAmbientVideoRef.current.pause();
+                                 }
+                               }}
+                               onSeeked={() => {
+                                 if (previewAmbientVideoRef.current && previewVideoRef.current) {
+                                   previewAmbientVideoRef.current.currentTime = previewVideoRef.current.currentTime;
+                                 }
+                               }}
+                               onTimeUpdate={handleVideoTimeUpdate}
+                               onLoadedMetadata={handleVideoLoadedMetadata}
+                               onEnded={() => {
+                                  if (previewVideoLoop) {
+                                    if (previewVideoRef.current) {
+                                      previewVideoRef.current.currentTime = 0;
+                                      previewVideoRef.current.play().catch(() => {});
+                                      setPreviewVideoPlaying(true);
+                                    }
+                                    if (previewAmbientVideoRef.current && isVideoGlowEnabled) {
+                                      previewAmbientVideoRef.current.currentTime = 0;
+                                      previewAmbientVideoRef.current.play().catch(() => {});
+                                    }
+                                  } else {
+                                    setPreviewVideoPlaying(false);
+                                    if (previewAmbientVideoRef.current) {
+                                      previewAmbientVideoRef.current.pause();
+                                    }
+                                  }
+                                }}
+                               onClick={(e) => { e.stopPropagation(); togglePreviewVideo(); }}
+                             />
+                           )}
 
-                       </div>
+                        </div>
                      ) : (
                        <div className="w-full h-[60vh] flex flex-col items-center justify-center relative overflow-hidden">
                           {/* Blurred Background */}
