@@ -981,12 +981,11 @@ const ChatView: React.FC<ChatViewProps> = ({
         });
       }
       if (m.video) {
-        const vidIndex = activeThread.filter((msg, i) => i <= activeThread.indexOf(m) && msg.video).length;
         items.push({ 
           type: 'video', 
           data: m.video, 
           name: 'Video Wan 2.2', 
-          fileName: `wan22_${agentName}_${dateStr}_${vidIndex}.mp4`,
+          fileName: `story_${agentName}_${dateStr}.mp4`,
           id: m.id, 
           timestamp: m.timestamp 
         });
@@ -1003,7 +1002,7 @@ const ChatView: React.FC<ChatViewProps> = ({
               type, 
               data: att.data, 
               name: att.name, 
-              fileName: att.name,
+              fileName: type === 'video' ? `story_${agentName}_${dateStr}.mp4` : att.name,
               id: m.id, 
               mimeType: att.mimeType,
               timestamp: m.timestamp
@@ -2947,8 +2946,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                         const d = new Date(m.timestamp);
                         const dateStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
                         const timeStr = `${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
-                        const vidIndex = activeThread.filter((msg, i) => i <= activeThread.indexOf(m) && msg.video).length;
-                        downloadMedia(m.video!, `story_${getSafeAgentName()}_${dateStr}_${timeStr}_${vidIndex}.mp4`, 'video/mp4'); 
+                        downloadMedia(m.video!, `story_${getSafeAgentName()}_${dateStr}_${timeStr}.mp4`, 'video/mp4'); 
                       }} className={`p-2.5 bg-black/60 backdrop-blur-md rounded-xl text-white hover:scale-110 active:scale-95 transition-all border ${m.role === 'user' ? dynamicBorderColor : 'border-white/20'}`} title="Unduh Video MP4"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg></button>
 
                       <button onClick={async (e) => {
@@ -3514,7 +3512,15 @@ const ChatView: React.FC<ChatViewProps> = ({
                             const papIndex = activeThread.filter((msg, i) => i <= activeThread.indexOf(m) && msg.image).length;
                             items.push({ type: 'image', data: m.image, name: 'PAP', id: m.id, fileName: `pap_${agentName}_${dateStr}_${papIndex}.png` });
                           }
-                          if (m.attachments) m.attachments.forEach(att => { if (att.mimeType.startsWith('image/') || att.mimeType.startsWith('video/')) items.push({ type: att.mimeType.startsWith('image/') ? 'image' : 'video', data: att.data, name: att.name, id: m.id, mimeType: att.mimeType, fileName: att.name }); });
+                          if (m.video) {
+                            items.push({ type: 'video', data: m.video, name: 'Video Wan 2.2', id: m.id, mimeType: 'video/mp4', fileName: `story_${agentName}_${dateStr}.mp4` });
+                          }
+                          if (m.attachments) m.attachments.forEach(att => { 
+                            if (att.mimeType.startsWith('image/') || att.mimeType.startsWith('video/')) {
+                              const isVid = att.mimeType.startsWith('video/');
+                              items.push({ type: isVid ? 'video' : 'image', data: att.data, name: att.name, id: m.id, mimeType: att.mimeType, fileName: isVid ? `story_${agentName}_${dateStr}.mp4` : att.name }); 
+                            }
+                          });
                         } else if (galleryTab === 'audio') {
                           if (m.audio) {
                             const vnIndex = activeThread.filter((msg, i) => i <= activeThread.indexOf(m) && msg.audio).length;
@@ -3563,6 +3569,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                   {activeThread.flatMap(m => {
                     const items: any[] = [];
                     if (m.image) items.push({ type: 'image', data: m.image, name: 'PAP', id: m.id });
+                    if (m.video) items.push({ type: 'video', data: m.video, name: 'Video Wan 2.2', id: m.id, mimeType: 'video/mp4' });
                     if (m.attachments) {
                       m.attachments.forEach(att => {
                         if (att.mimeType.startsWith('image/') || att.mimeType.startsWith('video/')) {
@@ -3587,10 +3594,14 @@ const ChatView: React.FC<ChatViewProps> = ({
                         const papIndex = activeThread.filter((msg, i) => i <= activeThread.indexOf(m) && msg.image).length;
                         items.push({ type: 'image', data: m.image, name: 'PAP', id: m.id, fileName: `pap_${agentName}_${dateStr}_${papIndex}.png` });
                       }
+                      if (m.video) {
+                        items.push({ type: 'video', data: m.video, name: 'Video Wan 2.2', id: m.id, mimeType: 'video/mp4', fileName: `story_${agentName}_${dateStr}.mp4` });
+                      }
                       if (m.attachments) {
                         m.attachments.forEach(att => {
                           if (att.mimeType.startsWith('image/') || att.mimeType.startsWith('video/')) {
-                            items.push({ type: att.mimeType.startsWith('image/') ? 'image' : 'video', data: att.data, name: att.name, id: m.id, mimeType: att.mimeType, fileName: att.name });
+                            const isVid = att.mimeType.startsWith('video/');
+                            items.push({ type: isVid ? 'video' : 'image', data: att.data, name: att.name, id: m.id, mimeType: att.mimeType, fileName: isVid ? `story_${agentName}_${dateStr}.mp4` : att.name });
                           }
                         });
                       }
@@ -3813,7 +3824,7 @@ const ChatView: React.FC<ChatViewProps> = ({
 
       {previewMedia && (
         <div 
-          className="fixed inset-0 z-[300] flex flex-col sm:items-center sm:justify-center sm:p-4 bg-black/95 backdrop-blur-3xl animate-in fade-in duration-300 select-none" 
+          className="fixed inset-y-0 right-0 left-0 md:left-20 z-[300] h-full flex flex-col bg-[#0a0f14] backdrop-blur-3xl animate-in fade-in duration-300 select-none overflow-hidden" 
           onClick={handleCloseMediaModal}
           onContextMenu={(e) => handleBgContextMenu(e)}
           onTouchStart={(e) => {
@@ -3829,12 +3840,12 @@ const ChatView: React.FC<ChatViewProps> = ({
             handleTouchEndInternal();
           }}
         >
-          <div className="relative max-w-4xl w-full h-[100dvh] sm:h-auto flex flex-col items-center gap-0 sm:gap-4 animate-in zoom-in duration-500" onClick={e => e.stopPropagation()}>
-            <div className="w-full flex justify-between items-center bg-[#0a0f14] backdrop-blur-xl pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:px-5 sm:py-3 rounded-none sm:border border-0 border-white/10 shadow-2xl">
+          <div className="relative w-full h-full flex flex-col items-stretch overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="w-full flex justify-between items-center bg-[#0a0f14] backdrop-blur-xl pt-[max(0.75rem,env(safe-area-inset-top))] px-4 sm:px-6 py-3 border-b border-white/10 shadow-2xl shrink-0 z-30">
               <div className="flex flex-col">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 truncate max-w-[200px]">{previewMedia.name}</p>
+                <p className="text-[11px] sm:text-xs font-black uppercase tracking-[0.3em] text-white/70 truncate max-w-[200px] sm:max-w-md">{previewMedia.name}</p>
                 {currentMediaIndex !== -1 && (
-                  <p className="text-[8px] font-bold text-white/30 uppercase tracking-widest mt-0.5">{currentMediaIndex + 1} dari {allMediaItems.length}</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{currentMediaIndex + 1} dari {allMediaItems.length}</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
@@ -3852,7 +3863,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                         agentName: config.name
                       });
                     }} 
-                    className={`p-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all active:scale-90 border border-white/10 group`}
+                    className="p-2 sm:p-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all active:scale-90 border border-white/10 group cursor-pointer"
                     title="Informasi Gambar"
                    >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -3861,21 +3872,30 @@ const ChatView: React.FC<ChatViewProps> = ({
                  <button 
                   onClick={() => {
                     const currentItem = allMediaItems[currentMediaIndex];
-                    const downloadName = currentItem?.fileName || previewMedia.name;
+                    let downloadName = currentItem?.fileName;
+                    const isVideo = previewMedia.mimeType?.startsWith('video/') || currentItem?.type === 'video' || previewMedia.name?.toLowerCase().includes('video') || previewMedia.name?.endsWith('.mp4');
+                    if (isVideo) {
+                      const d = new Date(currentItem?.timestamp || Date.now());
+                      const dateStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}_${String(d.getHours()).padStart(2, '0')}-${String(d.getMinutes()).padStart(2, '0')}-${String(d.getSeconds()).padStart(2, '0')}`;
+                      downloadName = `story_${getSafeAgentName()}_${dateStr}.mp4`;
+                    } else if (!downloadName) {
+                      downloadName = previewMedia.name;
+                    }
                     downloadMedia(previewMedia.data, downloadName, previewMedia.mimeType, previewMedia.id);
                   }} 
-                  className={`p-2.5 bg-white/10 rounded-xl text-white transition-all active:scale-90 border border-white/10 group`} 
+                  className="p-2 sm:p-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all active:scale-90 border border-white/10 group cursor-pointer" 
                   style={{ backgroundColor: `${themeHex}20` }}
+                  title="Download Media"
                  >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                  </button>
-                 <button onClick={handleCloseMediaModal} className="p-2.5 bg-white/10 hover:bg-red-500 rounded-xl text-white transition-all active:scale-90 border border-white/10 group">
+                 <button onClick={handleCloseMediaModal} className="p-2 sm:p-2.5 bg-white/10 hover:bg-red-500 rounded-xl text-white transition-all active:scale-90 border border-white/10 group cursor-pointer" title="Tutup">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                  </button>
               </div>
             </div>
 
-            <div className="relative w-full overflow-hidden sm:border border-0 border-white/10 shadow-2xl bg-[#0a0f14] flex items-center group/viewer">
+            <div className="relative w-full flex-1 min-h-0 overflow-hidden bg-[#0a0f14] flex items-center justify-center group/viewer">
                {/* 3. Text Info Progress - Melayang di tengah atas dengan opacity 50% */}
                {isRegeneratingVariation && (
                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-amber-500/40 text-amber-300 text-xs font-black shadow-2xl flex items-center gap-2 animate-pulse select-none">
@@ -3893,7 +3913,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                      ? sourceMsg.images.indexOf(previewMedia.data) 
                      : (sourceMsg.activeImageIndex ?? (sourceMsg.images.length - 1));
                    return (
-                     <div className="absolute bottom-4 left-4 z-30 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 shadow-2xl select-none">
+                     <div className="absolute bottom-4 left-4 sm:left-6 z-30 flex items-center gap-2 bg-[#0a0f14]/85 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 shadow-2xl select-none">
                        <button
                          type="button"
                          onClick={(e) => {
@@ -3946,8 +3966,8 @@ const ChatView: React.FC<ChatViewProps> = ({
                    type="button"
                    onClick={(e) => { e.stopPropagation(); handleRegenerateVariation(); }}
                    disabled={isRegeneratingVariation}
-                   className={`absolute bottom-4 right-4 z-30 w-11 h-11 rounded-full text-white transition-all active:scale-90 border border-white/20 shadow-2xl flex items-center justify-center cursor-pointer group backdrop-blur-md ${
-                     isRegeneratingVariation ? 'bg-amber-500/40 border-amber-500/60 text-amber-300 cursor-not-allowed' : 'bg-black/75 hover:bg-black/90'
+                   className={`absolute bottom-4 right-4 sm:right-6 z-30 w-11 h-11 rounded-full text-white transition-all active:scale-90 border border-white/20 shadow-2xl flex items-center justify-center cursor-pointer group backdrop-blur-md ${
+                     isRegeneratingVariation ? 'bg-amber-500/40 border-amber-500/60 text-amber-300 cursor-not-allowed' : 'bg-[#0a0f14]/85 hover:bg-[#0a0f14]'
                    }`}
                    title="Regenerate Variasi Gambar Baru (Data & Prompt Sama)"
                  >
@@ -3966,7 +3986,7 @@ const ChatView: React.FC<ChatViewProps> = ({
 
                {/* Floating Playback Controls (Video) - Tepat di atas footer, menempel sudut kiri & kanan */}
                {allMediaItems[currentMediaIndex]?.type === 'video' && (
-                 <div className="absolute bottom-0 left-0 right-0 w-full bg-black/95 backdrop-blur-md border-t border-white/15 px-4 py-2.5 flex items-center gap-2.5 shadow-2xl z-30 rounded-none">
+                 <div className="absolute bottom-0 left-0 right-0 w-full bg-[#0a0f14] backdrop-blur-xl border-t border-white/10 px-4 sm:px-6 py-2.5 flex items-center gap-2.5 shadow-2xl z-30 rounded-none">
                    <button 
                      onClick={(e) => { e.stopPropagation(); togglePreviewVideo(); }}
                      className="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-md shrink-0 cursor-pointer"
@@ -4039,7 +4059,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                {currentMediaIndex > 0 && (
                  <button 
                   onClick={(e) => { e.stopPropagation(); handlePrevMedia(); }}
-                  className="absolute left-4 z-20 p-4 bg-black/40 backdrop-blur-md rounded-full text-white opacity-0 group-hover/viewer:opacity-100 transition-all hover:bg-white/20 hidden md:block"
+                  className="absolute left-4 sm:left-6 z-20 p-3 sm:p-4 bg-black/60 hover:bg-white/20 backdrop-blur-md rounded-full text-white opacity-70 hover:opacity-100 transition-all border border-white/10 shadow-2xl hidden md:flex items-center justify-center cursor-pointer active:scale-95"
                  >
                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
                  </button>
@@ -4048,25 +4068,25 @@ const ChatView: React.FC<ChatViewProps> = ({
                {currentMediaIndex < allMediaItems.length - 1 && (
                  <button 
                   onClick={(e) => { e.stopPropagation(); handleNextMedia(); }}
-                  className="absolute right-4 z-10 p-4 bg-black/40 backdrop-blur-md rounded-full text-white opacity-0 group-hover/viewer:opacity-100 transition-all hover:bg-white/20 hidden md:block"
+                  className="absolute right-4 sm:right-6 z-20 p-3 sm:p-4 bg-black/60 hover:bg-white/20 backdrop-blur-md rounded-full text-white opacity-70 hover:opacity-100 transition-all border border-white/10 shadow-2xl hidden md:flex items-center justify-center cursor-pointer active:scale-95"
                  >
                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
                  </button>
                )}
 
                <div 
-                className={`flex w-full transition-transform duration-300 ease-out`}
+                className={`flex w-full h-full transition-transform duration-300 ease-out`}
                 style={{ 
                   transform: `translateX(calc(-${currentMediaIndex * 100}% + ${dragOffset}px))`,
                   transitionProperty: isDraggingMedia ? 'none' : 'transform'
                 }}
                >
                  {allMediaItems.map((item, i) => (
-                   <div key={i} className="w-full flex-shrink-0 flex items-center justify-center min-h-[40vh]">
+                   <div key={i} className="w-full h-full flex-shrink-0 flex items-center justify-center relative overflow-hidden">
                      {item.type === 'image' ? (
                        <div 
                          ref={i === currentMediaIndex ? mediaContainerRef : null}
-                         className={`relative w-full flex-1 flex items-center justify-center overflow-hidden touch-none select-none group ${
+                         className={`relative w-full h-full flex items-center justify-center overflow-hidden touch-none select-none group ${
                            mediaZoomScale > 1 ? (isMediaPanDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-pointer'
                          }`}
                          onTouchStart={handleMediaTouchStart}
@@ -4095,7 +4115,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                          <img 
                            ref={i === currentMediaIndex ? mediaImgRef : null}
                            src={item.data} 
-                           className="relative z-10 w-full h-auto max-h-full object-contain pointer-events-none select-none transition-transform drop-shadow-2xl" 
+                           className="relative z-10 max-w-full max-h-full object-contain pointer-events-none select-none transition-transform drop-shadow-2xl" 
                            style={{
                              transform: `translate(${mediaZoomPos.x}px, ${mediaZoomPos.y}px) scale(${mediaZoomScale})`,
                              transformOrigin: 'center center',
@@ -4104,8 +4124,8 @@ const ChatView: React.FC<ChatViewProps> = ({
                            alt={item.name} 
                          />
 
-                         {/* Floating Zoom & Pan Controls */}
-                         <div className="absolute top-14 sm:top-3 right-3 z-30 flex items-center gap-1.5 bg-black/75 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/20 shadow-2xl">
+                         {/* Floating Zoom & Pan Controls - Menyesuaikan posisi Mobile & Desktop */}
+                         <div className="absolute top-4 right-4 sm:top-4 sm:right-6 z-30 flex items-center gap-1.5 bg-[#0a0f14]/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 shadow-2xl">
                            <span className="text-[10px] font-black text-white px-2 py-0.5 rounded-full bg-white/10 font-mono">
                              {Math.round(mediaZoomScale * 100)}%
                            </span>
@@ -4138,7 +4158,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                          </div>
                        </div>
                      ) : item.type === 'video' ? (
-                       <div className="w-full h-full flex flex-col items-center justify-center relative" key={item.data}>
+                       <div className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden pb-14" key={item.data}>
                           {/* Ambient Light Mode Background */}
                           <div className="absolute inset-0 z-0">
                             {item.data && (
@@ -4165,7 +4185,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                             <video 
                               ref={previewVideoRef}
                               src={item.data} 
-                              className="relative z-10 w-full h-full object-contain shadow-2xl"
+                              className="relative z-10 max-w-full max-h-full object-contain shadow-2xl"
                               autoPlay
                               playsInline
                               onTimeUpdate={handleVideoTimeUpdate}
@@ -4280,12 +4300,18 @@ const ChatView: React.FC<ChatViewProps> = ({
                </div>
             </div>
             
-            {/* Mobile Navigation Hints */}
-            <div className="md:hidden flex gap-4 mt-2">
-               <div className="flex items-center gap-2 opacity-30">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                  <span className="text-[8px] font-black text-white uppercase tracking-widest">Swipe</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            {/* Footer Navigation (< SWIPE >) - Menyesuaikan Mobile & Desktop (WIDE) */}
+            <div className="w-full flex justify-between items-center py-2.5 px-4 sm:px-6 pb-[max(0.625rem,env(safe-area-inset-bottom))] bg-[#0a0f14] border-t border-white/10 shadow-2xl shrink-0 z-30">
+               <div className="text-[9px] font-bold text-white/30 uppercase tracking-widest hidden sm:block truncate max-w-[200px]">
+                  {allMediaItems[currentMediaIndex]?.fileName || previewMedia.name}
+               </div>
+               <div className="flex items-center justify-center gap-2 mx-auto sm:mx-0 opacity-40 hover:opacity-80 transition-opacity">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+                  <span className="text-[9px] font-black text-white uppercase tracking-[0.25em]">Swipe</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+               </div>
+               <div className="text-[9px] font-bold text-white/30 uppercase tracking-widest hidden sm:block text-right">
+                  {currentMediaIndex + 1} / {allMediaItems.length}
                </div>
             </div>
           </div>
