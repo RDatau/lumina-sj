@@ -3494,7 +3494,7 @@ const ChatView: React.FC<ChatViewProps> = ({
             style={glassStyles}
           >
             {/* Header */}
-            <div className={`pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:p-6 border-b ${dynamicBorderColor} flex items-center justify-between`}>
+            <div className={`pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:p-6 sm:border-b border-0 ${dynamicBorderColor} flex items-center justify-between`}>
               <div>
                 <h3 className={`text-xl font-black uppercase tracking-tighter ${dynamicTextColor}`}>Media & Galeri</h3>
                 <p className={`text-[10px] font-bold uppercase tracking-widest ${dynamicMutedTextColor}`}>Koleksi kenangan bareng {config.name}</p>
@@ -3830,7 +3830,7 @@ const ChatView: React.FC<ChatViewProps> = ({
           }}
         >
           <div className="relative max-w-4xl w-full h-[100dvh] sm:h-auto flex flex-col items-center gap-0 sm:gap-4 animate-in zoom-in duration-500" onClick={e => e.stopPropagation()}>
-            <div className="w-full flex justify-between items-center bg-white/5 backdrop-blur-xl pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:px-5 sm:py-3 sm:rounded-[20px] rounded-none border-0 sm:border border-white/10 shadow-2xl">
+            <div className="w-full flex justify-between items-center bg-white/5 backdrop-blur-xl pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:px-5 sm:py-3 sm:rounded-[20px] rounded-none sm:border border-0 border-white/10 shadow-2xl">
               <div className="flex flex-col">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 truncate max-w-[200px]">{previewMedia.name}</p>
                 {currentMediaIndex !== -1 && (
@@ -3875,7 +3875,7 @@ const ChatView: React.FC<ChatViewProps> = ({
               </div>
             </div>
 
-            <div className="relative w-full rounded-[30px] overflow-hidden border border-white/10 shadow-2xl bg-black/40 flex items-center group/viewer">
+            <div className="relative w-full rounded-[30px] overflow-hidden sm:border border-0 border-white/10 shadow-2xl bg-black/40 flex items-center group/viewer">
                {/* 3. Text Info Progress - Melayang di tengah atas dengan opacity 50% */}
                {isRegeneratingVariation && (
                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-amber-500/40 text-amber-300 text-xs font-black shadow-2xl flex items-center gap-2 animate-pulse select-none">
@@ -3995,7 +3995,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                      {item.type === 'image' ? (
                        <div 
                          ref={i === currentMediaIndex ? mediaContainerRef : null}
-                         className={`relative w-full h-[70vh] flex items-center justify-center overflow-hidden touch-none select-none group ${
+                         className={`relative w-full flex-1 flex items-center justify-center overflow-hidden touch-none select-none group ${
                            mediaZoomScale > 1 ? (isMediaPanDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-pointer'
                          }`}
                          onTouchStart={handleMediaTouchStart}
@@ -4024,7 +4024,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                          <img 
                            ref={i === currentMediaIndex ? mediaImgRef : null}
                            src={item.data} 
-                           className="relative z-10 w-full h-auto max-h-[70vh] object-contain pointer-events-none select-none transition-transform drop-shadow-2xl" 
+                           className="relative z-10 w-full h-auto max-h-full object-contain pointer-events-none select-none transition-transform drop-shadow-2xl" 
                            style={{
                              transform: `translate(${mediaZoomPos.x}px, ${mediaZoomPos.y}px) scale(${mediaZoomScale})`,
                              transformOrigin: 'center center',
@@ -4034,7 +4034,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                          />
 
                          {/* Floating Zoom & Pan Controls */}
-                         <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-black/75 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/20 shadow-2xl">
+                         <div className="absolute top-14 sm:top-3 right-3 z-30 flex items-center gap-1.5 bg-black/75 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-white/20 shadow-2xl">
                            <span className="text-[10px] font-black text-white px-2 py-0.5 rounded-full bg-white/10 font-mono">
                              {Math.round(mediaZoomScale * 100)}%
                            </span>
