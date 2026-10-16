@@ -914,9 +914,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                           themeHex={themeHex}
                           onChange={(val) => updateGlobalGemini({ textModel: val })}
                           options={[
+                            { value: 'gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite (Default)' },
+                            { value: 'gemini-3.5-flash-lite', label: 'gemini-3.5-flash-lite' },
+                            { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash' },
+                            { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
                             { value: 'gemini-3.8-flash', label: 'gemini-3.8-flash' },
                             { value: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview' },
-                            { value: 'gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite (Default)' }
+                            { value: 'gemini-1.5-flash', label: 'gemini-1.5-flash' }
                           ]}
                         />
                       </div>

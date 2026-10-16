@@ -1563,7 +1563,7 @@ const ChatView: React.FC<ChatViewProps> = ({
     try {
       setLoadingAudioId(msg.id); // Re-use loading state for visual feedback
       const textContent = (msg.text || '').trim() || (msg.attachments?.find(att => att.mimeType?.startsWith('audio/'))?.name || `Audio ${config.name}`);
-      const newTitle = await generateSmartTitle(textContent, userProfile.geminiApiKey, activeThread);
+      const newTitle = await generateSmartTitle(textContent, userProfile.geminiApiKey, activeThread, false, userProfile);
 
       if (newTitle) {
         setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, audioTitle: newTitle } : m));
@@ -1746,7 +1746,7 @@ const ChatView: React.FC<ChatViewProps> = ({
             if (!audioTitle) {
               try {
                 setMetadataStatus("Generate Judul Pintar...");
-                audioTitle = await generateSmartTitle(textContent, userProfile.geminiApiKey, activeThread);
+                audioTitle = await generateSmartTitle(textContent, userProfile.geminiApiKey, activeThread, false, userProfile);
                 // Update state agar tersimpan permanen
                 setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, audioTitle } : m));
                 // Update fileName agar file yang didownload pakai judul baru

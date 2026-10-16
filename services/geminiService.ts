@@ -103,7 +103,7 @@ const decodeBase64 = (base64: string) => {
  * Menghasilkan judul cerdas (tepat 4 kata) berdasarkan teks.
  * @param strict Jika true, akan mengembalikan string kosong jika gagal (bukan fallback).
  */
-export const generateSmartTitle = async (text: string, apiKey?: string, history: ChatMessage[] = [], strict: boolean = false): Promise<string> => {
+export const generateSmartTitle = async (text: string, apiKey?: string, history: ChatMessage[] = [], strict: boolean = false, userProfile?: UserProfile): Promise<string> => {
   if (!text || text.trim().length < 5) {
     return strict ? "" : "Lumina AI Chat Sayang";
   }
@@ -123,12 +123,12 @@ export const generateSmartTitle = async (text: string, apiKey?: string, history:
   }).join('\n');
 
   try {
-    const ai = createGeminiClient(apiKey);
+    const ai = createGeminiClient(apiKey || userProfile);
     
     const generate = async (input: string, isSanitized: boolean = false) => {
       console.log(`[SmartTitle] Attempting generation. Sanitized: ${isSanitized}`);
       return await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite",
+        model: getActiveTextModel(userProfile),
         contents: [{ parts: [{ text: `${contextHistory ? `RIWAYAT PERCAKAPAN SEBELUMNYA:\n${contextHistory}\n\n` : ''}PESAN TERBARU UNTUK DIRANGKUM: "${input}"` }] }],
         config: { 
           systemInstruction: `Konteks: Kamu adalah asisten kreatif yang membantu merangkum isi percakapan roleplay antara "Lumina" (AI) dan "Sayang" (User) menjadi Judul Pintar.
@@ -147,8 +147,7 @@ Aturan Mutlak:
           safetySettings: safetySettings as any,
           temperature: 0.7,
           topP: 0.95,
-          maxOutputTokens: 500,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+          maxOutputTokens: 500
         }
       });
     };
@@ -590,35 +589,41 @@ export const validateApiKey = async (apiKeyInput: string): Promise<{ valid: bool
   const keys = parseGeminiApiKeys(apiKeyInput);
   if (keys.length === 0) return { valid: false, message: "API Key kosong sayang.." };
 
+  const testModels = ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
+
   if (keys.length === 1) {
     const singleKey = keys[0];
-    try {
-      const ai = new GoogleGenAI({ apiKey: singleKey });
-      await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite",
-        contents: [{ parts: [{ text: "hi" }] }],
-        config: { maxOutputTokens: 2 }
-      });
-      return { 
-        valid: true, 
-        message: "API Key valid! ✨ Siap digunakan.",
-        activeKeyCount: 1
-      };
-    } catch (e: any) {
-      console.error("API Validation Error:", e);
-      const errorMsg = (e?.message || "").toLowerCase();
-      if (errorMsg.includes('429') || errorMsg.includes('resource_exhausted') || errorMsg.includes('quota')) {
+    let lastErr: any = null;
+    const ai = new GoogleGenAI({ apiKey: singleKey });
+    for (const m of testModels) {
+      try {
+        await ai.models.generateContent({
+          model: m,
+          contents: [{ parts: [{ text: "hi" }] }],
+          config: {}
+        });
         return { 
-          valid: false, 
-          message: "API Key valid, tapi kuota kamu lagi habis / rate limit (429). Tunggu sejenak atau tambahkan key cadangan.",
+          valid: true, 
+          message: "API Key valid! ✨ Siap digunakan.",
           activeKeyCount: 1
         };
+      } catch (e: any) {
+        lastErr = e;
+        const errorMsg = (e?.message || "").toLowerCase();
+        if (errorMsg.includes('429') || errorMsg.includes('resource_exhausted') || errorMsg.includes('quota')) {
+          return { 
+            valid: false, 
+            message: "API Key valid, tapi kuota kamu lagi habis / rate limit (429). Tunggu sejenak atau tambahkan key cadangan.",
+            activeKeyCount: 1
+          };
+        }
+        if (errorMsg.includes('api_key_invalid') || errorMsg.includes('not valid')) {
+          return { valid: false, message: "API Key tidak valid sayang, coba periksa kembali..", activeKeyCount: 0 };
+        }
       }
-      if (errorMsg.includes('api_key_invalid') || errorMsg.includes('not valid')) {
-        return { valid: false, message: "API Key tidak valid sayang, coba periksa kembali..", activeKeyCount: 0 };
-      }
-      return { valid: false, message: `Error: ${e?.message || "Gagal validasi"}`, activeKeyCount: 0 };
     }
+    console.error("API Validation Error:", lastErr);
+    return { valid: false, message: `Error: ${lastErr?.message || "Gagal validasi"}`, activeKeyCount: 0 };
   }
 
   // Validasi multi-key sekaligus
@@ -628,22 +633,32 @@ export const validateApiKey = async (apiKeyInput: string): Promise<{ valid: bool
 
   await Promise.all(
     keys.map(async (k) => {
-      try {
-        const ai = new GoogleGenAI({ apiKey: k });
-        await ai.models.generateContent({
-          model: "gemini-3.1-flash-lite",
-          contents: [{ parts: [{ text: "hi" }] }],
-          config: { maxOutputTokens: 2 }
-        });
-        validCount++;
-      } catch (err: any) {
-        const msg = (err?.message || "").toLowerCase();
-        if (msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted')) {
-          quotaCount++;
-          validCount++; // Masih valid secara otentikasi
-        } else {
-          invalidCount++;
+      const ai = new GoogleGenAI({ apiKey: k });
+      let success = false;
+      let isQuota = false;
+      for (const m of testModels) {
+        try {
+          await ai.models.generateContent({
+            model: m,
+            contents: [{ parts: [{ text: "hi" }] }],
+            config: {}
+          });
+          success = true;
+          break;
+        } catch (err: any) {
+          const msg = (err?.message || "").toLowerCase();
+          if (msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted')) {
+            success = true;
+            isQuota = true;
+            break;
+          }
         }
+      }
+      if (success) {
+        validCount++;
+        if (isQuota) quotaCount++;
+      } else {
+        invalidCount++;
       }
     })
   );
@@ -879,7 +894,8 @@ const retryOperation = async (
                            error.status === 429;
       const isKeyInvalid = errorMsg.includes('api_key_invalid') || 
                            errorMsg.includes('not valid') || 
-                           error.status === 400 || 
+                           errorMsg.includes('api key not valid') ||
+                           errorMsg.includes('permission_denied') ||
                            error.status === 403;
       const isConnectionError = errorMsg.includes('fetch failed') ||
                                 errorMsg.includes('network') ||
@@ -1284,7 +1300,6 @@ export const generateAgentResponse = async (
           systemInstruction: createSystemInstruction(effectiveConfig, effectiveUserProfile, 'CHAT', history), 
           temperature: 1.0, 
           topP: 0.98,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
           safetySettings: safetySettings as any,
           tools: tools.length > 0 ? tools : undefined
         }
@@ -1306,7 +1321,6 @@ export const generateAgentResponse = async (
             systemInstruction: createSystemInstruction(effectiveConfig, effectiveUserProfile, 'CHAT', history), 
             temperature: 1.0, 
             topP: 0.98,
-            thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
             safetySettings: safetySettings as any
           }
         });
@@ -4008,6 +4022,7 @@ export const enrichPersona = async (name: string, userProfile?: UserProfile): Pr
         Gunakan bahasa Indonesia yang formal tapi padat.` }] }],
         config: { 
           tools: useSearch ? [{ googleSearch: {} }] : undefined,
+          toolConfig: useSearch ? { includeServerSideToolInvocations: true } : undefined,
           safetySettings: safetySettings as any 
         }
       });
