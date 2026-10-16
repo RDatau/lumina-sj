@@ -3481,7 +3481,7 @@ const ChatView: React.FC<ChatViewProps> = ({
 
       {showGallery && (
         <div 
-          className={`fixed inset-0 z-[250] flex items-center justify-center p-4 ${isBackgroundDark ? 'bg-black/80' : 'bg-white/80'} backdrop-blur-2xl animate-in fade-in duration-300`} 
+          className={`fixed inset-0 z-[250] flex flex-col sm:items-center sm:justify-center sm:p-4 ${isBackgroundDark ? 'bg-black/80' : 'bg-white/80'} backdrop-blur-2xl animate-in fade-in duration-300`} 
           onClick={handleCloseMediaModal}
           onContextMenu={(e) => handleBgContextMenu(e)}
           onTouchStart={(e) => handleBgLongPress(e)}
@@ -3489,12 +3489,12 @@ const ChatView: React.FC<ChatViewProps> = ({
           onTouchEnd={handleTouchEndInternal}
         >
           <div 
-            className={`relative max-w-2xl w-full h-[80vh] flex flex-col rounded-[35px] border ${dynamicBorderColor} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500`} 
+            className={`relative max-w-2xl w-full h-[100dvh] sm:h-[80vh] flex flex-col sm:rounded-[35px] rounded-none border-0 sm:border ${dynamicBorderColor} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500`} 
             onClick={e => e.stopPropagation()}
             style={glassStyles}
           >
             {/* Header */}
-            <div className={`p-6 border-b ${dynamicBorderColor} flex items-center justify-between`}>
+            <div className={`pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:p-6 border-b ${dynamicBorderColor} flex items-center justify-between`}>
               <div>
                 <h3 className={`text-xl font-black uppercase tracking-tighter ${dynamicTextColor}`}>Media & Galeri</h3>
                 <p className={`text-[10px] font-bold uppercase tracking-widest ${dynamicMutedTextColor}`}>Koleksi kenangan bareng {config.name}</p>
@@ -3813,7 +3813,7 @@ const ChatView: React.FC<ChatViewProps> = ({
 
       {previewMedia && (
         <div 
-          className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/95 backdrop-blur-3xl animate-in fade-in duration-300 select-none" 
+          className="fixed inset-0 z-[300] flex flex-col sm:items-center sm:justify-center sm:p-4 bg-black/95 backdrop-blur-3xl animate-in fade-in duration-300 select-none" 
           onClick={handleCloseMediaModal}
           onContextMenu={(e) => handleBgContextMenu(e)}
           onTouchStart={(e) => {
@@ -3829,8 +3829,8 @@ const ChatView: React.FC<ChatViewProps> = ({
             handleTouchEndInternal();
           }}
         >
-          <div className="relative max-w-4xl w-full flex flex-col items-center gap-4 animate-in zoom-in duration-500" onClick={e => e.stopPropagation()}>
-            <div className="w-full flex justify-between items-center bg-white/5 backdrop-blur-xl px-5 py-3 rounded-[20px] border border-white/10 shadow-2xl">
+          <div className="relative max-w-4xl w-full h-[100dvh] sm:h-auto flex flex-col items-center gap-0 sm:gap-4 animate-in zoom-in duration-500" onClick={e => e.stopPropagation()}>
+            <div className="w-full flex justify-between items-center bg-white/5 backdrop-blur-xl pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:px-5 sm:py-3 sm:rounded-[20px] rounded-none border-0 sm:border border-white/10 shadow-2xl">
               <div className="flex flex-col">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 truncate max-w-[200px]">{previewMedia.name}</p>
                 {currentMediaIndex !== -1 && (
