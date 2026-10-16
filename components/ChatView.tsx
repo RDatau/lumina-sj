@@ -3491,10 +3491,10 @@ const ChatView: React.FC<ChatViewProps> = ({
           <div 
             className={`relative max-w-2xl w-full h-[100dvh] sm:h-[80vh] flex flex-col sm:rounded-[35px] rounded-none border-0 sm:border ${dynamicBorderColor} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500`} 
             onClick={e => e.stopPropagation()}
-            style={glassStyles}
+            style={{...glassStyles, backgroundColor: '#0a0f14'}}
           >
             {/* Header */}
-            <div className={`pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:p-6 sm:border-b border-0 ${dynamicBorderColor} flex items-center justify-between`}>
+            <div className={`pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:p-6 sm:border-b border-0 ${dynamicBorderColor} flex items-center justify-between bg-[#0a0f14]`}>
               <div>
                 <h3 className={`text-xl font-black uppercase tracking-tighter ${dynamicTextColor}`}>Media & Galeri</h3>
                 <p className={`text-[10px] font-bold uppercase tracking-widest ${dynamicMutedTextColor}`}>Koleksi kenangan bareng {config.name}</p>
@@ -3830,7 +3830,7 @@ const ChatView: React.FC<ChatViewProps> = ({
           }}
         >
           <div className="relative max-w-4xl w-full h-[100dvh] sm:h-auto flex flex-col items-center gap-0 sm:gap-4 animate-in zoom-in duration-500" onClick={e => e.stopPropagation()}>
-            <div className="w-full flex justify-between items-center bg-white/5 backdrop-blur-xl pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:px-5 sm:py-3 sm:rounded-[20px] rounded-none sm:border border-0 border-white/10 shadow-2xl">
+            <div className="w-full flex justify-between items-center bg-[#0a0f14] backdrop-blur-xl pt-[max(0.75rem,env(safe-area-inset-top))] px-4 pb-3 sm:px-5 sm:py-3 rounded-none sm:border border-0 border-white/10 shadow-2xl">
               <div className="flex flex-col">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 truncate max-w-[200px]">{previewMedia.name}</p>
                 {currentMediaIndex !== -1 && (
@@ -3875,7 +3875,7 @@ const ChatView: React.FC<ChatViewProps> = ({
               </div>
             </div>
 
-            <div className="relative w-full rounded-[30px] overflow-hidden sm:border border-0 border-white/10 shadow-2xl bg-black/40 flex items-center group/viewer">
+            <div className="relative w-full overflow-hidden sm:border border-0 border-white/10 shadow-2xl bg-[#0a0f14] flex items-center group/viewer">
                {/* 3. Text Info Progress - Melayang di tengah atas dengan opacity 50% */}
                {isRegeneratingVariation && (
                  <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-amber-500/40 text-amber-300 text-xs font-black shadow-2xl flex items-center gap-2 animate-pulse select-none">
@@ -3962,6 +3962,77 @@ const ChatView: React.FC<ChatViewProps> = ({
                      </svg>
                    )}
                  </button>
+               )}
+
+               {/* Floating Playback Controls (Video) - Tepat di atas footer, menempel sudut kiri & kanan */}
+               {allMediaItems[currentMediaIndex]?.type === 'video' && (
+                 <div className="absolute bottom-0 left-0 right-0 w-full bg-black/95 backdrop-blur-md border-t border-white/15 px-4 py-2.5 flex items-center gap-2.5 shadow-2xl z-30 rounded-none">
+                   <button 
+                     onClick={(e) => { e.stopPropagation(); togglePreviewVideo(); }}
+                     className="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-md shrink-0 cursor-pointer"
+                     style={{ backgroundColor: themeHex }}
+                   >
+                     {previewVideoPlaying ? (
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                     ) : (
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                     )}
+                   </button>
+
+                   <div className="flex-1 flex flex-col gap-1">
+                     <div className="flex justify-between items-center px-0.5">
+                       <span className="text-[9px] font-black text-white/70 uppercase tracking-widest truncate max-w-[120px]">{allMediaItems[currentMediaIndex]?.name || previewMedia.name}</span>
+                       <span className="text-[9px] font-bold text-white/50 font-mono">
+                         {`${Math.floor(previewVideoRef.current?.currentTime || 0)}s / ${Math.floor(previewVideoDuration || 0)}s`}
+                       </span>
+                     </div>
+                     <input 
+                       type="range" 
+                       min="0" 
+                       max="100" 
+                       value={previewVideoProgress || 0}
+                       onChange={handleVideoSeek}
+                       onClick={(e) => e.stopPropagation()}
+                       className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-white transition-all"
+                       style={{ 
+                         background: `linear-gradient(to right, ${themeHex} ${previewVideoProgress || 0}%, rgba(255,255,255,0.2) ${previewVideoProgress || 0}%)` 
+                       }}
+                     />
+                   </div>
+
+                   <button
+                     type="button"
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       setPreviewVideoLoop(!previewVideoLoop);
+                     }}
+                     className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0 cursor-pointer ${previewVideoLoop ? "bg-white/20 text-white shadow-inner ring-1 ring-white/35" : "bg-white/10 hover:bg-white/20 text-white/40"}`}
+                     title={previewVideoLoop ? "Loop: Aktif" : "Loop: Nonaktif"}
+                   >
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" />
+                     </svg>
+                   </button>
+
+                   <button
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       if (previewVideoRef.current) {
+                         if (document.fullscreenElement) {
+                           document.exitFullscreen().catch(() => {});
+                         } else {
+                           previewVideoRef.current.requestFullscreen().catch(() => {});
+                         }
+                       }
+                     }}
+                     className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all shrink-0 cursor-pointer"
+                     title="Layar Penuh (Fullscreen)"
+                   >
+                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                     </svg>
+                   </button>
+                 </div>
                )}
 
                {/* Navigation Arrows (Desktop) */}
@@ -4067,7 +4138,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                          </div>
                        </div>
                      ) : item.type === 'video' ? (
-                       <div className="w-full h-[70vh] flex flex-col items-center justify-center relative overflow-hidden" key={item.data}>
+                       <div className="w-full h-full flex flex-col items-center justify-center relative" key={item.data}>
                           {/* Ambient Light Mode Background */}
                           <div className="absolute inset-0 z-0">
                             {item.data && (
@@ -4094,7 +4165,7 @@ const ChatView: React.FC<ChatViewProps> = ({
                             <video 
                               ref={previewVideoRef}
                               src={item.data} 
-                              className="relative z-10 w-full h-auto max-h-[70vh] object-contain shadow-2xl"
+                              className="relative z-10 w-full h-full object-contain shadow-2xl"
                               autoPlay
                               playsInline
                               onTimeUpdate={handleVideoTimeUpdate}
@@ -4114,74 +4185,6 @@ const ChatView: React.FC<ChatViewProps> = ({
                             />
                           )}
 
-                          {/* Floating Playback Controls */}
-                          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-sm bg-black/90 border border-white/15 rounded-2xl px-3 py-2 flex items-center gap-2.5 shadow-xl z-[999]">
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); togglePreviewVideo(); }}
-                              className="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-md shrink-0 cursor-pointer"
-                              style={{ backgroundColor: themeHex }}
-                            >
-                              {previewVideoPlaying && currentMediaIndex === i ? (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                              ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                              )}
-                            </button>
-
-                            <div className="flex-1 flex flex-col gap-1">
-                              <div className="flex justify-between items-center px-0.5">
-                                <span className="text-[9px] font-black text-white/70 uppercase tracking-widest truncate max-w-[120px]">{item.name}</span>
-                                <span className="text-[9px] font-bold text-white/50 font-mono">
-                                  {currentMediaIndex === i ? `${Math.floor(previewVideoRef.current?.currentTime || 0)}s / ${Math.floor(previewVideoDuration || 0)}s` : '0s / 0s'}
-                                </span>
-                              </div>
-                              <input 
-                                type="range" 
-                                min="0" 
-                                max="100" 
-                                value={currentMediaIndex === i ? previewVideoProgress : 0}
-                                onChange={handleVideoSeek}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-white transition-all"
-                                style={{ 
-                                  background: `linear-gradient(to right, ${themeHex} ${currentMediaIndex === i ? previewVideoProgress : 0}%, rgba(255,255,255,0.2) ${currentMediaIndex === i ? previewVideoProgress : 0}%)` 
-                                }}
-                              />
-                            </div>
-
-                                                         <button
-                               type="button"
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 setPreviewVideoLoop(!previewVideoLoop);
-                               }}
-                               className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0 cursor-pointer ${previewVideoLoop ? "bg-white/20 text-white shadow-inner ring-1 ring-white/35" : "bg-white/10 hover:bg-white/20 text-white/40"}`}
-                               title={previewVideoLoop ? "Loop: Aktif" : "Loop: Nonaktif"}
-                             >
-                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" />
-                               </svg>
-                             </button>
-
-                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (previewVideoRef.current) {
-                                  if (document.fullscreenElement) {
-                                    document.exitFullscreen().catch(() => {});
-                                  } else {
-                                    previewVideoRef.current.requestFullscreen().catch(() => {});
-                                  }
-                                }
-                              }}
-                              className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all shrink-0 cursor-pointer"
-                              title="Layar Penuh (Fullscreen)"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                              </svg>
-                            </button>
-                          </div>
                        </div>
                      ) : (
                        <div className="w-full h-[60vh] flex flex-col items-center justify-center relative overflow-hidden">
