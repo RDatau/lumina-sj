@@ -80,24 +80,8 @@ export const downloadMediaFile = async (
         typeof (window as any).gonative !== 'undefined'
       );
 
-    const file = new File([blob], fileName, { type: mimeType || blob.type });
-
-    // 1. Jika di HP/APK, coba gunakan Web Share API (paling aman untuk nama file)
-    if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: fileName,
-          text: `Simpan file ${fileName}`
-        });
-        return; // Berhasil!
-      } catch (e) {
-        console.warn('Share dibatalkan atau gagal, lanjut ke unduh standar.');
-      }
-    }
-
-    // 2. Fallback: Gunakan anchor download standar
-    console.log('[exportHelper] Menggunakan fallback download...');
+    // Standard: Menggunakan <a> download standar (paling kompatibel & responsif)
+    console.log('[exportHelper] Menggunakan unduhan standar...');
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = blobUrl;
@@ -106,6 +90,7 @@ export const downloadMediaFile = async (
     document.body.appendChild(link);
     link.click();
     
+    // Clean up DOM node
     setTimeout(() => {
         URL.revokeObjectURL(blobUrl);
         document.body.removeChild(link);
