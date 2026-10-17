@@ -80,51 +80,35 @@ export const downloadMediaFile = async (
         typeof (window as any).gonative !== 'undefined'
       );
 
-    // 1. COBA DENGAN FORM POST (Paling Reliabel untuk WebView)
-    if (isMedianOrWebView) {
-      try {
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        const dataUrl = await new Promise<string>((resolve) => {
-          reader.onloadend = () => resolve(reader.result as string);
-        });
-        const dataBase64 = dataUrl.split(',')[1] || dataUrl;
+    const file = new File([blob], fileName, { type: mimeType || blob.type });
 
-        // Buat form tersembunyi untuk POST data (menghindari URI_TOO_LONG & fetch restriction)
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `${window.location.origin}/api/download-proxy`;
-        
-        const fields = { data: dataBase64, fileName, mimeType: mimeType || blob.type };
-        for (const [key, value] of Object.entries(fields)) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = key;
-          input.value = value as string;
-          form.appendChild(input);
-        }
-        
-        document.body.appendChild(form);
-        form.submit(); // Submit form untuk memicu unduhan native
-        document.body.removeChild(form);
+    // 1. Jika di HP/APK, coba gunakan Web Share API (paling aman untuk nama file)
+    if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: fileName,
+          text: `Simpan file ${fileName}`
+        });
         return; // Berhasil!
       } catch (e) {
-        console.warn('[exportHelper] Form POST gagal, mencoba fallback...');
+        console.warn('Share dibatalkan atau gagal, lanjut ke unduh standar.');
       }
     }
 
-    // 2. FALLBACK: Jika proxy gagal ATAU bukan WebView Median, 
-    // gunakan metode download biasa (paling aman & paling responsif)
+    // 2. Fallback: Gunakan anchor download standar
     console.log('[exportHelper] Menggunakan fallback download...');
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = fileName;
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
     
-    // Clean up DOM node
     setTimeout(() => {
         URL.revokeObjectURL(blobUrl);
+        document.body.removeChild(link);
     }, 1500);
     return;
 
