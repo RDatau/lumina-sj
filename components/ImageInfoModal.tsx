@@ -442,7 +442,7 @@ export const ImageInfoModal: React.FC<ImageInfoModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[500] flex items-center justify-center p-3 md:p-6 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+      className={`fixed inset-0 z-[500] flex items-center justify-center p-3 md:p-6 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 ${typeof window !== 'undefined' && !!(window as any).electron?.isElectron ? 'pt-8' : ''}`}
       onClick={onClose}
     >
       <div 

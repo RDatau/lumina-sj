@@ -80,7 +80,39 @@ export const downloadMediaFile = async (
         typeof (window as any).gonative !== 'undefined'
       );
 
-    // Standard: Menggunakan <a> download standar (paling kompatibel & responsif)
+    // CRITICAL FIX FOR MEDIAN.CO APK:
+    // Try Proxy POST for WebView to force Content-Disposition.
+    if (isMedianOrWebView) {
+      try {
+        console.log('[exportHelper] Mencoba unduhan via proxy...');
+        const reader = new FileReader();
+        const base64Data = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+
+        const response = await fetch('/api/download-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: base64Data, fileName, mimeType })
+        });
+
+        if (response.ok) {
+          const blobRes = await response.blob();
+          const url = URL.createObjectURL(blobRes);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          link.click();
+          URL.revokeObjectURL(url);
+          return;
+        }
+      } catch (e) {
+        console.error('[exportHelper] Proxy download failed, falling back:', e);
+      }
+    }
+
+    // Standard: Menggunakan <a> download standar
     console.log('[exportHelper] Menggunakan unduhan standar...');
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');

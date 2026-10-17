@@ -1986,7 +1986,7 @@ export const generateVideoPromptWithAI = async (
   const isExplicitUserPrompt = /sex|fuck|pussy|dick|cock|kontol|memek|pepek|ngentot|telanjang|nude|naked|colok|isap|suck|kiss|boobs|tetek|payudara|desah|moan|clit|erotic|vagina|penis|orgasm|cum|crot|sperma|vulgar|horny/i.test(userRequest || '');
 
   const fallback = isExplicitUserPrompt
-    ? "intimate sensual motion, passionate close-up, heavy breathing with chest rising and falling, parted lips, intense sensual eye gaze, flushed warm skin, natural bodily physics, smooth 4k animation"
+    ? "intimate sensual motion, passionate close-up, sleepy eyes and slightly parted lips, intense sensual eye gaze, natural bodily physics, smooth 4k animation"
     : "cinematic motion, slow camera zoom in, character smiling gently while looking at the camera, soft natural lighting, high resolution, fluid motion, 4k photorealistic";
 
   if (!userRequest && !characterContext) return fallback;
@@ -2007,7 +2007,7 @@ CRITICAL RULES:
    - If the user's request contains explicit, vulgar, erotic, nude, sexual, sensual, intimate, or adult actions:
      * ABSOLUTE ZERO SANITIZATION OR CENSORSHIP: The target model is an uncensored diffusion video model. DO NOT censor, DO NOT soften, DO NOT euphemize, and DO NOT replace explicit commands with tame or generic actions.
      * FAITHFULLY translate and formulate all explicit acts, bodily motions, skin-to-skin contacts, physical interactions, and micro-expressions into bold, accurate, and vivid English diffusion terms.
-     * Explicitly describe the physical bodily dynamics, fluid motion, heavy breathing with rising and falling chest, parted lips, passionate eye gaze, flushed warm skin, and realistic anatomical physics.
+     * Explicitly describe the physical bodily dynamics, fluid motion, sleepy eyes and slightly parted lips, passionate eye gaze, and realistic anatomical physics.
 
 3. DYNAMIC MOTION & CAMERA WORK:
    - Detail the dynamic movement: subject gestures, bodily posture changes, facial expressions, micro-movements, hair and garment physics.

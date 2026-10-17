@@ -3887,7 +3887,7 @@ const ChatView: React.FC<ChatViewProps> = ({
 
       {previewMedia && (
         <div 
-          className="fixed inset-y-0 right-0 left-0 md:left-20 z-[300] h-full flex flex-col bg-[#0a0f14] animate-in fade-in duration-300 select-none overflow-hidden" 
+          className={`fixed inset-y-0 right-0 left-0 md:left-20 z-[300] h-full flex flex-col bg-[#0a0f14] animate-in fade-in duration-300 select-none overflow-hidden ${typeof window !== 'undefined' && !!(window as any).electron?.isElectron ? 'pt-8' : ''}`} 
           onClick={handleCloseMediaModal}
           onContextMenu={(e) => handleBgContextMenu(e)}
           onTouchStart={(e) => {
