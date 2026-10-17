@@ -90,27 +90,17 @@ export const downloadMediaFile = async (
         });
 
         const dataBase64 = dataUrl.split(',')[1] || dataUrl;
-          
-          // Send to our new API proxy using GET
-          const response = await fetch(`${window.location.origin}/api/download-proxy?` + 
-            new URLSearchParams({ 
-              data: dataBase64, 
-              fileName, 
-              mimeType: mimeType || blob.type 
-            }), 
-            { method: 'GET' }
-          );
-          
-          if (response.ok) {
-            const blobResp = await response.blob();
-            const blobUrl = URL.createObjectURL(blobResp);
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = fileName;
-            link.click();
-            URL.revokeObjectURL(blobUrl);
-            return; // Berhasil, keluar dari fungsi
-          }
+        
+        // Gunakan navigasi langsung agar WebView memicu DownloadListener secara native
+        const proxyUrl = `${window.location.origin}/api/download-proxy?` + 
+          new URLSearchParams({ 
+            data: dataBase64, 
+            fileName, 
+            mimeType: mimeType || blob.type 
+          });
+        
+        window.location.href = proxyUrl;
+        return; // Berhasil memicu navigasi unduhan
       } catch (e) {
         console.warn('[exportHelper] Download proxy gagal, mencoba fallback...');
       }
