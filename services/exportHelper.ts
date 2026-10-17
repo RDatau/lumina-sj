@@ -80,29 +80,28 @@ export const downloadMediaFile = async (
         typeof (window as any).gonative !== 'undefined'
       );
 
-    // 1. COBA DENGAN DOWNLOAD PROXY (Metode Vercel Server)
+    // 1. COBA DENGAN JS BRIDGE MEDIAN (Metode Native Paling Reliabel)
     if (isMedianOrWebView) {
       try {
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        const dataUrl = await new Promise<string>((resolve) => {
-          reader.onloadend = () => resolve(reader.result as string);
-        });
-
-        const dataBase64 = dataUrl.split(',')[1] || dataUrl;
-        
-        // Gunakan navigasi langsung agar WebView memicu DownloadListener secara native
-        const proxyUrl = `${window.location.origin}/api/download-proxy?` + 
-          new URLSearchParams({ 
-            data: dataBase64, 
-            fileName, 
-            mimeType: mimeType || blob.type 
+        const bridge = (window as any).median || (window as any).gonative;
+        if (bridge && bridge.share && typeof bridge.share.downloadFile === 'function') {
+          // Konversi Blob ke Data URI
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          const dataUrl = await new Promise<string>((resolve) => {
+            reader.onloadend = () => resolve(reader.result as string);
           });
-        
-        window.location.href = proxyUrl;
-        return; // Berhasil memicu navigasi unduhan
+          
+          // Panggil fungsi native Median
+          bridge.share.downloadFile({
+            url: dataUrl,
+            title: fileName,
+            open: false // False agar tidak langsung dibuka, tapi diunduh
+          });
+          return; // Berhasil!
+        }
       } catch (e) {
-        console.warn('[exportHelper] Download proxy gagal, mencoba fallback...');
+        console.warn('[exportHelper] Bridge download gagal, mencoba fallback...');
       }
     }
 
