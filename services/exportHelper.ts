@@ -89,22 +89,28 @@ export const downloadMediaFile = async (
           reader.onloadend = () => resolve(reader.result as string);
         });
 
-        const response = await fetch(`${window.location.origin}/api/download-proxy`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: dataUrl, fileName, mimeType: mimeType || blob.type })
-        });
-        
-        if (response.ok) {
-          const blobResp = await response.blob();
-          const blobUrl = URL.createObjectURL(blobResp);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = fileName;
-          link.click();
-          URL.revokeObjectURL(blobUrl);
-          return; // Berhasil, keluar dari fungsi
-        }
+        const dataBase64 = dataUrl.split(',')[1] || dataUrl;
+          
+          // Send to our new API proxy using GET
+          const response = await fetch(`${window.location.origin}/api/download-proxy?` + 
+            new URLSearchParams({ 
+              data: dataBase64, 
+              fileName, 
+              mimeType: mimeType || blob.type 
+            }), 
+            { method: 'GET' }
+          );
+          
+          if (response.ok) {
+            const blobResp = await response.blob();
+            const blobUrl = URL.createObjectURL(blobResp);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(blobUrl);
+            return; // Berhasil, keluar dari fungsi
+          }
       } catch (e) {
         console.warn('[exportHelper] Download proxy gagal, mencoba fallback...');
       }

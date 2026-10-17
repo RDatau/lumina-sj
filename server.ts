@@ -139,19 +139,21 @@ async function startServer() {
   // ==========================================
   // Download Proxy: Force Content-Disposition for Android WebView
   // ==========================================
-  app.post('/api/download-proxy', express.json({ limit: '50mb' }), (req, res) => {
-    console.log('Received download request:', req.body.fileName);
-    const { data, fileName, mimeType } = req.body;
+  // ==========================================
+  // Download Proxy: Force Content-Disposition for Android WebView
+  // ==========================================
+  app.get('/api/download-proxy', (req, res) => {
+    const { data, fileName, mimeType } = req.query;
     if (!data || !fileName) {
-      console.error('Missing data or fileName');
+      console.error('Missing data or fileName in query params');
       return res.status(400).send('Missing data or fileName');
     }
     
     try {
-      const buffer = Buffer.from(data.split(',')[1] || data, 'base64');
+      const buffer = Buffer.from(data as string, 'base64');
       
-      res.setHeader('Content-Type', mimeType || 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+      res.setHeader('Content-Type', (mimeType as string) || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName as string)}"`);
       res.send(buffer);
     } catch (e) {
       console.error('Proxy error:', e);
