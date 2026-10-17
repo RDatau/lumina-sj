@@ -137,6 +137,22 @@ async function startServer() {
   });
 
   // ==========================================
+  // Download Proxy: Force Content-Disposition for Android WebView
+  // ==========================================
+  app.post('/api/download-proxy', (req, res) => {
+    const { data, fileName, mimeType } = req.body;
+    if (!data || !fileName) {
+      return res.status(400).send('Missing data or fileName');
+    }
+    
+    const buffer = Buffer.from(data.split(',')[1] || data, 'base64');
+    
+    res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.send(buffer);
+  });
+
+  // ==========================================
   // Vite Middlewares (Dev) or Static dist (Prod)
   // ==========================================
   if (!isProduction) {

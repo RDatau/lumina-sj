@@ -80,12 +80,42 @@ export const downloadMediaFile = async (
         typeof (window as any).gonative !== 'undefined'
       );
 
-    // CRITICAL FIX FOR MEDIAN.CO APK & MOBILE ANDROID WEBVIEW:
-    // Android WebView's native DownloadListener does NOT receive HTML5 download="filename" attributes,
-    // causing files to be saved as "download.ext" via URLUtil.guessFileName.
-    // By using the Web Share API (navigator.share with File object), Android invokes its native system
-    // Share Sheet which cleanly displays the real filename and offers "Simpan ke File" / "Drive" / File Manager.
-    if ((isMedianOrWebView || isMobile) && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    // CRITICAL FIX FOR MEDIAN.CO APK:
+    // Android WebView's DownloadListener ignores HTML5 download attribute.
+    // We proxy the file request through our own server to set the Content-Disposition header.
+    if (isMedianOrWebView) {
+      try {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = async () => {
+          const dataUrl = reader.result as string;
+          
+          // Send to our new API proxy
+          const response = await fetch('/api/download-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: dataUrl, fileName, mimeType: mimeType || blob.type })
+          });
+          
+          if (response.ok) {
+            const blobResp = await response.blob();
+            const blobUrl = URL.createObjectURL(blobResp);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = fileName;
+            link.click();
+            URL.revokeObjectURL(blobUrl);
+            return;
+          }
+        };
+        return;
+      } catch (e) {
+        console.warn('[exportHelper] Download proxy failed, falling back:', e);
+      }
+    }
+
+    // Fallback: Use Web Share API if available
+    if ((isMobile) && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
         let shareMime = mimeType || blob.type || 'application/octet-stream';
         let file = new File([blob], fileName, {
@@ -100,31 +130,15 @@ export const downloadMediaFile = async (
           canShare = true;
         }
 
-        // Compatibility fallback: Older Android WebViews sometimes reject application/json in canShare,
-        // but accept text/plain while still keeping the custom .json extension in file.name.
-        if (!canShare && (fileName.endsWith('.json') || shareMime.includes('json'))) {
-          try {
-            const textFile = new File([blob], fileName, {
-              type: 'text/plain',
-              lastModified: Date.now()
-            });
-            if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [textFile] })) {
-              file = textFile;
-              canShare = true;
-            }
-          } catch {}
-        }
-
         if (canShare) {
           await navigator.share({
             files: [file],
             title: fileName,
             text: fileName
           });
-          return; // Successfully presented native share/save sheet with custom filename
+          return; 
         }
       } catch (shareErr: any) {
-        // If user actively cancelled/dismissed the share sheet, respect their intent and don't fallback to downloading download.ext
         if (shareErr?.name === 'AbortError') {
           return;
         }
