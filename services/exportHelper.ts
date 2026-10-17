@@ -80,28 +80,36 @@ export const downloadMediaFile = async (
         typeof (window as any).gonative !== 'undefined'
       );
 
-    // 1. COBA DENGAN JS BRIDGE MEDIAN (Metode Native Paling Reliabel)
+    // 1. COBA DENGAN FORM POST (Paling Reliabel untuk WebView)
     if (isMedianOrWebView) {
       try {
-        const bridge = (window as any).median || (window as any).gonative;
-        if (bridge && bridge.share && typeof bridge.share.downloadFile === 'function') {
-          // Konversi Blob ke Data URI
-          const reader = new FileReader();
-          reader.readAsDataURL(blob);
-          const dataUrl = await new Promise<string>((resolve) => {
-            reader.onloadend = () => resolve(reader.result as string);
-          });
-          
-          // Panggil fungsi native Median
-          bridge.share.downloadFile({
-            url: dataUrl,
-            title: fileName,
-            open: false // False agar tidak langsung dibuka, tapi diunduh
-          });
-          return; // Berhasil!
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        const dataUrl = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+        });
+        const dataBase64 = dataUrl.split(',')[1] || dataUrl;
+
+        // Buat form tersembunyi untuk POST data (menghindari URI_TOO_LONG & fetch restriction)
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `${window.location.origin}/api/download-proxy`;
+        
+        const fields = { data: dataBase64, fileName, mimeType: mimeType || blob.type };
+        for (const [key, value] of Object.entries(fields)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = value as string;
+          form.appendChild(input);
         }
+        
+        document.body.appendChild(form);
+        form.submit(); // Submit form untuk memicu unduhan native
+        document.body.removeChild(form);
+        return; // Berhasil!
       } catch (e) {
-        console.warn('[exportHelper] Bridge download gagal, mencoba fallback...');
+        console.warn('[exportHelper] Form POST gagal, mencoba fallback...');
       }
     }
 

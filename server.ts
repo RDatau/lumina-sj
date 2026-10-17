@@ -142,10 +142,13 @@ async function startServer() {
   // ==========================================
   // Download Proxy: Force Content-Disposition for Android WebView
   // ==========================================
-  app.get('/api/download-proxy', (req, res) => {
-    const { data, fileName, mimeType } = req.query;
+  // ==========================================
+  // Download Proxy: Force Content-Disposition for Android WebView
+  // ==========================================
+  app.post('/api/download-proxy', express.urlencoded({ extended: true, limit: '50mb' }), (req, res) => {
+    const { data, fileName, mimeType } = req.body;
     if (!data || !fileName) {
-      console.error('Missing data or fileName in query params');
+      console.error('Missing data or fileName in POST body');
       return res.status(400).send('Missing data or fileName');
     }
     
