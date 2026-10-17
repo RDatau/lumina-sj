@@ -80,101 +80,50 @@ export const downloadMediaFile = async (
         typeof (window as any).gonative !== 'undefined'
       );
 
-    // CRITICAL FIX FOR MEDIAN.CO APK:
-    // Android WebView's DownloadListener ignores HTML5 download attribute.
-    // We proxy the file request through our own server to set the Content-Disposition header.
+    // 1. COBA DENGAN DOWNLOAD PROXY (Metode Vercel Server)
     if (isMedianOrWebView) {
       try {
         const reader = new FileReader();
         reader.readAsDataURL(blob);
-        reader.onloadend = async () => {
-          const dataUrl = reader.result as string;
-          
-          // Send to our new API proxy
-          const response = await fetch('/api/download-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data: dataUrl, fileName, mimeType: mimeType || blob.type })
-          });
-          
-          if (response.ok) {
-            const blobResp = await response.blob();
-            const blobUrl = URL.createObjectURL(blobResp);
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = fileName;
-            link.click();
-            URL.revokeObjectURL(blobUrl);
-            return;
-          }
-        };
-        return;
-      } catch (e) {
-        console.warn('[exportHelper] Download proxy failed, falling back:', e);
-      }
-    }
-
-    // Fallback: Use Web Share API if available
-    if ((isMobile) && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      try {
-        let shareMime = mimeType || blob.type || 'application/octet-stream';
-        let file = new File([blob], fileName, {
-          type: shareMime,
-          lastModified: Date.now()
+        const dataUrl = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
         });
 
-        let canShare = false;
-        if (typeof navigator.canShare === 'function') {
-          canShare = navigator.canShare({ files: [file] });
-        } else {
-          canShare = true;
+        const response = await fetch(`${window.location.origin}/api/download-proxy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: dataUrl, fileName, mimeType: mimeType || blob.type })
+        });
+        
+        if (response.ok) {
+          const blobResp = await response.blob();
+          const blobUrl = URL.createObjectURL(blobResp);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = fileName;
+          link.click();
+          URL.revokeObjectURL(blobUrl);
+          return; // Berhasil, keluar dari fungsi
         }
-
-        if (canShare) {
-          await navigator.share({
-            files: [file],
-            title: fileName,
-            text: fileName
-          });
-          return; 
-        }
-      } catch (shareErr: any) {
-        if (shareErr?.name === 'AbortError') {
-          return;
-        }
-        console.warn('[downloadMediaFile] Web Share API failed, falling back to direct anchor download:', shareErr);
+      } catch (e) {
+        console.warn('[exportHelper] Download proxy gagal, mencoba fallback...');
       }
     }
 
-    // Desktop browsers & Web Share fallback: Direct link download
+    // 2. FALLBACK: Jika proxy gagal ATAU bukan WebView Median, 
+    // gunakan metode download biasa (paling aman & paling responsif)
+    console.log('[exportHelper] Menggunakan fallback download...');
     const blobUrl = URL.createObjectURL(blob);
-
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = fileName;
-    link.setAttribute('download', fileName);
-    link.setAttribute('data-filename', fileName);
-    link.style.display = 'none';
-    document.body.appendChild(link);
-
-    // Trigger download
     link.click();
-
+    
     // Clean up DOM node
     setTimeout(() => {
-      try {
-        if (link.parentNode) {
-          document.body.removeChild(link);
-        }
-      } catch {}
-    }, 1500);
-
-    // Keep Blob URL alive for 60 seconds
-    setTimeout(() => {
-      try {
         URL.revokeObjectURL(blobUrl);
-      } catch {}
-    }, 60000);
+    }, 1500);
+    return;
 
   } catch (err) {
     console.error('[downloadMediaFile] Failed to download:', err);
