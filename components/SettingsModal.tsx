@@ -3,6 +3,7 @@ import { Eye, EyeOff, Key, Loader2, CheckCircle2, XCircle, Globe, Sparkles, Slid
 import { validateApiKey, parseGeminiApiKeys } from "../services/geminiService";
 import { GlobalAppearance, UserProfile } from '../types';
 import GlassDropdown from './GlassDropdown';
+import { downloadJsonFile } from '../services/exportHelper';
 import { saveGlobalGeminiSettingsSync, DEFAULT_QWEN_SPACE_URL, DEFAULT_WAN_VIDEO_SPACE_URL, DEFAULT_LTX_VIDEO_SPACE_URL } from '../services/dbService';
 import { testHuggingFaceSpace, parseHFTokens, HFTestResult } from '../services/huggingFaceService';
 import { 
@@ -207,16 +208,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleBackup = () => {
-    const data = JSON.stringify(appearance, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
     const now = new Date();
     const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
-    link.download = `appearance_lumina_${dateStr}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const fileName = `appearance_lumina_${dateStr}.json`;
+    downloadJsonFile(appearance, fileName);
   };
 
   const handleRestore = (e: React.ChangeEvent<HTMLInputElement> | File) => {

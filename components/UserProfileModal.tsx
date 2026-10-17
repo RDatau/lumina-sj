@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile, GlobalAppearance } from '../types';
+import { downloadJsonFile } from '../services/exportHelper';
 import { Volume2, Smartphone, Bell, Trash2, Camera, User, Download, Upload, RefreshCw } from 'lucide-react';
 import { 
   getNotificationSettings, 
@@ -110,17 +111,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       profilePic,
       exportDate: new Date().toISOString()
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const now = new Date();
     const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `profile_${name.toLowerCase().replace(/\s+/g, '_') || 'user'}_${dateStr}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const fileName = `profile_${name.toLowerCase().replace(/\s+/g, '_') || 'user'}_${dateStr}.json`;
+    downloadJsonFile(data, fileName);
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement> | File) => {

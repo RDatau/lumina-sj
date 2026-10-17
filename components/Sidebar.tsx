@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ChatMessage, CallHistory, ChatSession, AgentConfig, GlobalAppearance } from '../types';
 import { dbService, FullBackup, GlobalBackup } from '../services/dbService';
+import { downloadJsonFile } from '../services/exportHelper';
 import { LogOut } from 'lucide-react';
 
 interface SidebarProps {
@@ -61,19 +62,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     setIsDataActionLoading(true);
     try {
       const allData = await dbService.getAllDataForBackup();
-      const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
       const agentName = config.name.toLowerCase().replace(/\s+/g, '_');
-      
-      link.href = url;
-      link.download = `${agentName}_${dateStr}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const fileName = `${agentName}_${dateStr}.json`;
+      await downloadJsonFile(allData, fileName);
     } catch (e) {
       alert("Gagal membuat backup. Coba lagi sayang... 💦");
     } finally {
@@ -85,18 +78,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     setIsDataActionLoading(true);
     try {
       const allData = await dbService.getGlobalDataForBackup();
-      const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
-      
-      link.href = url;
-      link.download = `global_lumina_${dateStr}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const fileName = `global_lumina_${dateStr}.json`;
+      await downloadJsonFile(allData, fileName);
     } catch (e) {
       alert("Gagal membuat backup global. Coba lagi sayang... 💦");
     } finally {

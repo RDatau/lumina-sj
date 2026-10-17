@@ -16,6 +16,7 @@ import ElectronTitleBar from './components/ElectronTitleBar';
 import { dbService, FullBackup, GlobalBackup, getStoredGlobalGeminiSettings, setStoredGlobalGeminiSettings, DEFAULT_GLOBAL_GEMINI_SETTINGS, getEffectiveGlobalGeminiSettings, saveGlobalGeminiSettingsSync } from './services/dbService';
 import { getDominantColor, enrichPersona } from './services/geminiService';
 import { GlobalGeminiSettings } from './types';
+import { downloadJsonFile } from './services/exportHelper';
 
 const LUMINA_DEFAULT_PIC = 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&q=80&w=600';
 const DEFAULT_BG = 'https://www.gstatic.com/images/branding/product/2x/google_chat_64dp.png'; // Placeholder for Google style, but we'll use CSS mostly
@@ -1030,18 +1031,11 @@ const App: React.FC = () => {
   const handleExportProfile = async (profile: AgentConfig) => {
     try {
       const data = await dbService.getAgentDataForBackup(profile.id!);
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
       const agentName = profile.name.toLowerCase().replace(/\s+/g, '_');
-      a.download = `${agentName}_${dateStr}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const fileName = `${agentName}_${dateStr}.json`;
+      await downloadJsonFile(data, fileName);
     } catch (e) {
       alert("Gagal export profil sayang... 💦");
     }
@@ -1572,19 +1566,11 @@ const App: React.FC = () => {
   const handleBackup = async () => {
     try {
       const allData = await dbService.getAllDataForBackup();
-      const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
       const agentName = config.name.toLowerCase().replace(/\s+/g, '_');
-      
-      link.href = url;
-      link.download = `${agentName}_${dateStr}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const fileName = `${agentName}_${dateStr}.json`;
+      await downloadJsonFile(allData, fileName);
     } catch (e) {
       alert("Gagal membuat backup profil sayang... 💦");
     }
@@ -1593,18 +1579,10 @@ const App: React.FC = () => {
   const handleGlobalBackup = async () => {
     try {
       const allData = await dbService.getGlobalDataForBackup();
-      const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
-      
-      link.href = url;
-      link.download = `global_lumina_${dateStr}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const fileName = `global_lumina_${dateStr}.json`;
+      await downloadJsonFile(allData, fileName);
     } catch (e) {
       alert("Gagal membuat backup global sayang... 💦");
     }

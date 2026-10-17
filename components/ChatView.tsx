@@ -6,6 +6,7 @@ import { triggerNewMessageNotification } from '../services/notificationService';
 import ImageInfoModal from './ImageInfoModal';
 import WanVideoModal from './WanVideoModal';
 import VideoInfoModal from './VideoInfoModal';
+import { downloadTextFile } from '../services/exportHelper';
 
 
 const decodeBase64 = (base64: string) => {
@@ -2440,16 +2441,11 @@ const ChatView: React.FC<ChatViewProps> = ({
 
   const exportChat = () => {
     const text = activeThread.map(m => `${m.role.toUpperCase()} [${new Date(m.timestamp).toLocaleString()}]: ${m.text}`).join('\n\n');
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
     const now = new Date();
     const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
     const agentName = config.name.toLowerCase().replace(/\s+/g, '_');
-    link.download = `export_chat_${agentName}_${dateStr}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const fileName = `export_chat_${agentName}_${dateStr}.txt`;
+    downloadTextFile(text, fileName, 'text/plain;charset=utf-8');
   };
 
   const AttachmentPreview: React.FC<{ attachment: Attachment, onRemove?: () => void, onPreview?: () => void }> = ({ attachment, onRemove, onPreview }) => {
