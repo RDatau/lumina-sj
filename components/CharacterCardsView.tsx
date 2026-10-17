@@ -254,14 +254,14 @@ const CharacterCardsView: React.FC<CharacterCardsViewProps> = ({
         >
           <div className="pointer-events-auto">
             <header 
-              className={`flex items-center justify-between min-h-[56px] shadow-2xl transition-all duration-300 rounded-none md:rounded-full ${isSidebar ? 'p-1.5 px-3' : 'px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 md:px-6'}`} 
+              className={`flex items-center justify-between min-h-[56px] shadow-2xl transition-all duration-300 rounded-none md:rounded-full max-md:!border-none ${isSidebar ? 'p-1.5 px-3' : 'px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 md:px-6'}`} 
               style={{
                 background: isBackgroundDark 
                   ? `rgba(10, 15, 20, ${(appearance?.transparency ?? 0) / 100})`
                   : `rgba(255, 255, 255, ${(appearance?.transparency ?? 0) / 100})`,
                 backdropFilter: (appearance?.blur ?? 40) === 0 ? 'none' : `blur(${appearance?.blur ?? 40}px)`,
                 WebkitBackdropFilter: (appearance?.blur ?? 40) === 0 ? 'none' : `blur(${appearance?.blur ?? 40}px)`,
-                border: isBackgroundDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.08)'
+                border: isMobile ? 'none' : (isBackgroundDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.08)')
               }}
             >
             <div className="flex items-center gap-3 min-w-0">
