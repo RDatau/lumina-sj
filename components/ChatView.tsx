@@ -6,7 +6,7 @@ import { triggerNewMessageNotification } from '../services/notificationService';
 import ImageInfoModal from './ImageInfoModal';
 import WanVideoModal from './WanVideoModal';
 import VideoInfoModal from './VideoInfoModal';
-import { downloadTextFile } from '../services/exportHelper';
+import { downloadTextFile, downloadMediaFile } from '../services/exportHelper';
 
 
 const decodeBase64 = (base64: string) => {
@@ -1781,16 +1781,7 @@ const ChatView: React.FC<ChatViewProps> = ({
     setMetadataStatus("Menyiapkan File...");
     try {
       if (urlOrBase64.startsWith('http')) {
-        const response = await fetch(urlOrBase64);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 100);
+        await downloadMediaFile(urlOrBase64, fileName, mimeType);
         return;
       }
 
@@ -1863,21 +1854,10 @@ const ChatView: React.FC<ChatViewProps> = ({
         }
       }
 
-      const blob = new Blob([data], { type: finalMime });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 100);
+      await downloadMediaFile(data, fileName, finalMime);
     } catch (e) {
-      const link = document.createElement('a');
-      link.href = urlOrBase64;
-      link.download = fileName;
-      link.target = "_blank";
-      link.click();
+      console.error("Error in downloadMedia:", e);
+      await downloadMediaFile(urlOrBase64, fileName, mimeType);
     } finally {
       setIsProcessingMetadata(false);
       setMetadataStatus("");

@@ -1,6 +1,7 @@
 import React from 'react';
 import { AgentConfig, GlobalAppearance, ActiveGenerationTask, ChatMessage } from '../types';
 import { cleanResponseText } from '../services/geminiService';
+import { downloadMediaFile } from '../services/exportHelper';
 
 interface ProfileSelectorViewProps {
   profiles: AgentConfig[];
@@ -194,39 +195,9 @@ const ProfileSelectorView: React.FC<ProfileSelectorViewProps> = ({
 
   const downloadMedia = async (urlOrBase64: string, fileName: string, mimeType: string) => {
     try {
-      if (urlOrBase64.startsWith('http')) {
-        const response = await fetch(urlOrBase64);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 100);
-        return;
-      }
-      const binaryString = window.atob(urlOrBase64.split(',')[1] || urlOrBase64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-      const isDataUrl = urlOrBase64.startsWith('data:');
-      const finalMime = isDataUrl ? urlOrBase64.split(':')[1].split(';')[0] : mimeType;
-      const blob = new Blob([bytes], { type: finalMime });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 100);
+      await downloadMediaFile(urlOrBase64, fileName, mimeType);
     } catch (e) {
-      const link = document.createElement('a');
-      link.href = urlOrBase64;
-      link.download = fileName;
-      link.target = "_blank";
-      link.click();
+      console.error("Error downloading media:", e);
     }
   };
 

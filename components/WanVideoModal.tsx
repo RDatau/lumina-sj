@@ -3,6 +3,7 @@ import { AgentConfig, UserProfile, ActiveGenerationTask } from '../types';
 import { generateWanVideo, generateLtxVideo, proxyFetch, DEFAULT_LTX_VIDEO_SPACE_URL } from '../services/huggingFaceService';
 import { generateVideoPromptWithAI, generateVideoCommentaryWithAI } from '../services/geminiService';
 import { DEFAULT_WAN_VIDEO_SPACE_URL } from '../services/dbService';
+import { downloadMediaFile } from '../services/exportHelper';
 
 interface ChatHistoryImage {
   url: string;
@@ -280,15 +281,11 @@ export const WanVideoModal: React.FC<WanVideoModalProps> = ({
   // Download Generated Video
   const handleDownload = () => {
     if (!generatedVideoUrl) return;
-    const link = document.createElement('a');
-    link.href = generatedVideoUrl;
     const now = new Date();
     const dateStr = `${now.getDate().toString().padStart(2, '0')}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getFullYear()}`;
     const timeStr = `${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}-${now.getSeconds().toString().padStart(2, '0')}`;
-    link.download = `story_${agentConfig.name.toLowerCase().replace(/\s+/g, '_')}_${dateStr}_${timeStr}.mp4`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const fileName = `story_${agentConfig.name.toLowerCase().replace(/\s+/g, '_')}_${dateStr}_${timeStr}.mp4`;
+    downloadMediaFile(generatedVideoUrl, fileName, 'video/mp4');
   };
 
   // Save/Insert to Chat
