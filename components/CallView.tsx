@@ -5,7 +5,6 @@ import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { 
   createSystemInstruction, 
   getEffectiveState, 
-  safetySettings, 
   cleanResponseText, 
   parseAgentText,
   parseGeminiApiKeys,
@@ -630,8 +629,7 @@ const CallView: React.FC<CallViewProps> = ({
               }
             }
           },
-          systemInstruction: formattedSystemInstruction,
-          safetySettings: safetySettings as any
+          systemInstruction: formattedSystemInstruction
         };
 
         sessionPromiseRef.current = ai.live.connect({
