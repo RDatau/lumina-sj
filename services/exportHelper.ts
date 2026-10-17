@@ -4,6 +4,7 @@
  * - Median.co / GoNative Android & iOS APK / IPA
  * - Mobile Chrome PWA / Safari PWA
  * - Desktop Browsers (Chrome, Edge, Firefox, Safari)
+ * - Android WebView Scoped Storage
  */
 
 export const downloadMediaFile = async (
@@ -40,7 +41,7 @@ export const downloadMediaFile = async (
           const res = await fetch(urlOrData);
           blob = await res.blob();
         } catch {
-          // If CORS prevents fetch, use direct <a> download
+          // If CORS prevents fetch, use direct <a> download fallback
           const link = document.createElement('a');
           link.href = urlOrData;
           link.download = fileName;
@@ -69,10 +70,71 @@ export const downloadMediaFile = async (
       blob = new Blob([urlOrData as any], { type: mimeType });
     }
 
-    // Create object URL from blob
+    // Determine platform environment
+    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isMedianOrWebView = 
+      typeof navigator !== 'undefined' && (
+        /gonative|median/i.test(navigator.userAgent) || 
+        /Android.*(wv|\.0\.0\.0|Version\/4\.0)/i.test(navigator.userAgent) || 
+        typeof (window as any).median !== 'undefined' || 
+        typeof (window as any).gonative !== 'undefined'
+      );
+
+    // CRITICAL FIX FOR MEDIAN.CO APK & MOBILE ANDROID WEBVIEW:
+    // Android WebView's native DownloadListener does NOT receive HTML5 download="filename" attributes,
+    // causing files to be saved as "download.ext" via URLUtil.guessFileName.
+    // By using the Web Share API (navigator.share with File object), Android invokes its native system
+    // Share Sheet which cleanly displays the real filename and offers "Simpan ke File" / "Drive" / File Manager.
+    if ((isMedianOrWebView || isMobile) && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        let shareMime = mimeType || blob.type || 'application/octet-stream';
+        let file = new File([blob], fileName, {
+          type: shareMime,
+          lastModified: Date.now()
+        });
+
+        let canShare = false;
+        if (typeof navigator.canShare === 'function') {
+          canShare = navigator.canShare({ files: [file] });
+        } else {
+          canShare = true;
+        }
+
+        // Compatibility fallback: Older Android WebViews sometimes reject application/json in canShare,
+        // but accept text/plain while still keeping the custom .json extension in file.name.
+        if (!canShare && (fileName.endsWith('.json') || shareMime.includes('json'))) {
+          try {
+            const textFile = new File([blob], fileName, {
+              type: 'text/plain',
+              lastModified: Date.now()
+            });
+            if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [textFile] })) {
+              file = textFile;
+              canShare = true;
+            }
+          } catch {}
+        }
+
+        if (canShare) {
+          await navigator.share({
+            files: [file],
+            title: fileName,
+            text: fileName
+          });
+          return; // Successfully presented native share/save sheet with custom filename
+        }
+      } catch (shareErr: any) {
+        // If user actively cancelled/dismissed the share sheet, respect their intent and don't fallback to downloading download.ext
+        if (shareErr?.name === 'AbortError') {
+          return;
+        }
+        console.warn('[downloadMediaFile] Web Share API failed, falling back to direct anchor download:', shareErr);
+      }
+    }
+
+    // Desktop browsers & Web Share fallback: Direct link download
     const blobUrl = URL.createObjectURL(blob);
 
-    // Create anchor element with explicit download attributes
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = fileName;
@@ -81,10 +143,10 @@ export const downloadMediaFile = async (
     link.style.display = 'none';
     document.body.appendChild(link);
 
-    // Trigger download immediately
+    // Trigger download
     link.click();
 
-    // Clean up DOM node after 1.5s (gives Android WebView enough time to inspect the clicked element)
+    // Clean up DOM node
     setTimeout(() => {
       try {
         if (link.parentNode) {
@@ -93,9 +155,7 @@ export const downloadMediaFile = async (
       } catch {}
     }, 1500);
 
-    // Keep Blob URL alive for 60 seconds!
-    // CRITICAL: Median.co Android BlobDownloader reads the blob asynchronously via JS bridge.
-    // If revoked too early (e.g. 100ms), the download fails or defaults to download.ext.
+    // Keep Blob URL alive for 60 seconds
     setTimeout(() => {
       try {
         URL.revokeObjectURL(blobUrl);
@@ -104,7 +164,7 @@ export const downloadMediaFile = async (
 
   } catch (err) {
     console.error('[downloadMediaFile] Failed to download:', err);
-    // Fallback: if string url was provided, try direct link
+    // Ultimate fallback: if string url was provided, try direct link
     if (typeof urlOrData === 'string') {
       const link = document.createElement('a');
       link.href = urlOrData;
