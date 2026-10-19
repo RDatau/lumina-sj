@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { ChatMessage, CallHistory, ChatSession, AgentConfig, GlobalAppearance } from '../types';
 import { dbService, FullBackup, GlobalBackup } from '../services/dbService';
 import { downloadJsonFile } from '../services/exportHelper';
+import { workerParse } from '../services/backupWorkerService';
 import { LogOut } from 'lucide-react';
 
 interface SidebarProps {
@@ -106,7 +107,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const json = JSON.parse(event.target?.result as string);
+        const textContent = event.target?.result as string;
+        const json = await workerParse(textContent);
         if (json.type === 'global') {
           setPendingGlobalRestoreData(json as GlobalBackup);
         } else {

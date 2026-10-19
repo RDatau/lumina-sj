@@ -4,6 +4,7 @@ import { validateApiKey, parseGeminiApiKeys } from "../services/geminiService";
 import { GlobalAppearance, UserProfile } from '../types';
 import GlassDropdown from './GlassDropdown';
 import { downloadJsonFile } from '../services/exportHelper';
+import { workerParse } from '../services/backupWorkerService';
 import { saveGlobalGeminiSettingsSync, DEFAULT_QWEN_SPACE_URL, DEFAULT_WAN_VIDEO_SPACE_URL, DEFAULT_LTX_VIDEO_SPACE_URL } from '../services/dbService';
 import { testHuggingFaceSpace, parseHFTokens, HFTestResult } from '../services/huggingFaceService';
 import { 
@@ -218,9 +219,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const file = e instanceof File ? e : e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
-        const json = JSON.parse(event.target?.result as string);
+        const textContent = event.target?.result as string;
+        const json = await workerParse(textContent);
         if (json.background && typeof json.blur === 'number') {
           setAppearance(json);
         } else {

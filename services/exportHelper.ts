@@ -148,6 +148,8 @@ export const downloadMediaFile = async (
   }
 };
 
+import { workerStringify } from './backupWorkerService';
+
 export const downloadTextFile = async (
   content: string, 
   fileName: string, 
@@ -158,6 +160,7 @@ export const downloadTextFile = async (
 };
 
 export const downloadJsonFile = async (data: any, fileName: string): Promise<void> => {
-  const jsonString = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const jsonString = typeof data === 'string' ? data : await workerStringify(data);
   return downloadTextFile(jsonString, fileName, 'application/json;charset=utf-8');
 };
+
